@@ -40,7 +40,8 @@ export default function AdministrationPage() {
 
   useEffect(() => {
     let live = true
-    db.auth.getSession().then(async ({ data }) => {
+    db.auth.getSession().then(async (response: Awaited<ReturnType<typeof db.auth.getSession>>) => {
+      const { data } = response;
       if (!live) return
       if (!data.session) { router.replace('/'); return }
       try { await refresh(); if (live) setReady(true) }
