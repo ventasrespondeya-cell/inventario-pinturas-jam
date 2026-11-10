@@ -1,0 +1,73 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const route = readFileSync(new URL('../app/operaciones/page.tsx', import.meta.url), 'utf8')
+
+test('la consola operativa exige sesión Supabase', () => {
+  assert.match(route, /auth\.getSession\(\)/)
+  assert.match(route, /signInWithPassword/)
+  assert.match(route, /auth\.signOut\(\)/)
+})
+
+test('la consola consulta servicios reales de catálogo, inventario y área comercial', () => {
+  assert.match(route, /catalog\.listProducts/)
+  assert.match(route, /inventory\.stock/)
+  assert.match(route, /commercial\.listSales/)
+  assert.match(route, /purchases\.listPurchases/)
+})
+
+test('el alta de cliente pasa por el servicio validado y no por escrituras directas', () => {
+  assert.match(route, /commercial\.saveCustomer/)
+  assert.doesNotMatch(route, /\.from\(['"]jam_customers['"]\)\.insert/)
+})
+
+test('la consola no expone secretos de Supabase', () => {
+  assert.doesNotMatch(route, /process\.env\.[A-Z_]*SERVICE_ROLE/i)
+})
+
+test('el panel principal dirige acciones rápidas a las secciones operativas reales', () => {
+  const dashboard = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
+  assert.match(dashboard, /href="\/operaciones\?section=Ventas"/)
+  assert.match(dashboard, /href="\/operaciones\?section=Compras"/)
+  assert.match(dashboard, /href="\/operaciones\?section=Inventario"/)
+  assert.match(dashboard, /href="\/operaciones\?section=Cotizaciones"/)
+})
+
+test('las opciones de operación rápida navegan al módulo en vez de cerrar sin acción', () => {
+  const dashboard = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
+  const modal = dashboard.slice(dashboard.indexOf('function QuickModal('), dashboard.indexOf('function MiniChart('))
+  assert.match(modal, /href: '\/operaciones\?section=Ventas'/)
+  assert.match(modal, /href: '\/operaciones\?section=Compras'/)
+  assert.match(modal, /href: '\/operaciones\?section=Clientes'/)
+  assert.match(modal, /onClick={onClose}/)
+})
+
+test('la consola abre la sección indicada por el enlace del dashboard', () => {
+  assert.match(route, /params\.get\('section'\)/)
+  assert.match(route, /setSection\(requested as Section\)/)
+})
+
+test('compras permite crear, aprobar y recibir mercancía usando PurchasesService', () => {
+  assert.match(route, /purchases\.createPurchase/)
+  assert.match(route, /purchases\.approvePurchase/)
+  assert.match(route, /purchases\.receiveAndPost/)
+  assert.match(route, /idempotencyKey: crypto\.randomUUID\(\)/)
+  assert.match(route, /Recibir cantidades pendientes y actualizar stock/)
+})
+
+test('cuentas por pagar registra pagos mediante el servicio y conserva la moneda de la deuda', () => {
+  assert.match(route, /purchases\.listPayables/)
+  assert.match(route, /purchases\.registerPayment/)
+  assert.match(route, /currency: String\(payable\.currency\) as Currency/)
+})
+
+test('reportes consultan ventas, compras, cuentas y eventos pendientes desde servicios Supabase', async () => {
+  const source = route;
+  assert.match(source, /commercial\.listSales\(reportFrom, reportTo\)/);
+  assert.match(source, /purchases\.listPurchases\(\{ from: reportFrom, to: reportTo \}\)/);
+  assert.match(source, /commercial\.listReceivables\(\)/);
+  assert.match(source, /purchases\.listPayables\(\)/);
+  assert.match(source, /commercial\.listCashEventsPending\(500\)/);
+  assert.match(source, /Abre caja y ejecuta la sincronización/);
+});

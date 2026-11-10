@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { calculateDocument, calculateLine, outstanding, multiply } from '../lib/modules/commercial/calculations.ts';
+import { validateCustomer, validateSale, validateQuote } from '../lib/modules/commercial/validation.ts';
+const uuid='123e4567-e89b-42d3-a456-426614174000';
+test('calcula línea con descuento e impuesto sin flotantes',()=>{assert.deepEqual(calculateLine({quantity:'3',unitPrice:'10.25',discountAmount:'1.25',taxAmount:'1.5'}),{gross:'30.75',discount:'1.25',taxable:'29.5',tax:'1.5',total:'31'});});
+test('calcula totales de documento',()=>{assert.deepEqual(calculateDocument([{quantity:'2',unitPrice:'5',discountAmount:'1'},{quantity:'1',unitPrice:'8',taxAmount:'1.2'}]),{lines:[{gross:'10',discount:'1',taxable:'9',tax:'0',total:'9'},{gross:'8',discount:'0',taxable:'8',tax:'1.2',total:'9.2'}],subtotal:'18',discountTotal:'1',taxTotal:'1.2',total:'18.2'});});
+test('saldo no permite pagos superiores',()=>{assert.equal(outstanding('100',['20','30']),'50');assert.throws(()=>outstanding('10',['11']));});
+test('multiplicación decimal exacta',()=>{assert.equal(multiply('123.456789','2.5'),'308.641972');});
+test('valida cliente y correo',()=>{assert.equal(validateCustomer({name:'Cliente',email:'mal'}).length,1);assert.deepEqual(validateCustomer({name:'Cliente',email:'cliente@example.com',creditLimit:'100'}),[]);});
+test('valida venta y exige clave, depósito y líneas',()=>{assert.deepEqual(validateSale({warehouseId:uuid,currency:'USD',idempotencyKey:'sale-1',lines:[{productId:uuid,quantity:'2',unitPrice:'4'}],payments:[]}),[]);assert.ok(validateSale({warehouseId:'x',currency:'USD',idempotencyKey:'',lines:[],payments:[]}).length>=3);});
+test('valida cotización sin efectos de inventario',()=>{assert.deepEqual(validateQuote({currency:'VES',lines:[{productId:uuid,quantity:'1',unitPrice:'2'}]}),[]);});

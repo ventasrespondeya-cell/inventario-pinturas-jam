@@ -1,0 +1,289 @@
+TAP version 13
+# (node:939) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Chat 4 cash migration has atomic open, movement, summary and close RPCs
+ok 1 - Chat 4 cash migration has atomic open, movement, summary and close RPCs
+  ---
+  duration_ms: 0.923848
+  type: 'test'
+  ...
+# Subtest: cash client uses RPCs and never accesses service-role credentials
+ok 2 - cash client uses RPCs and never accesses service-role credentials
+  ---
+  duration_ms: 0.274243
+  type: 'test'
+  ...
+# Subtest: cash screen provides open, income/expense, event sync and counted close actions
+ok 3 - cash screen provides open, income/expense, event sync and counted close actions
+  ---
+  duration_ms: 0.260732
+  type: 'test'
+  ...
+# (node:950) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: calcula línea con descuento e impuesto sin flotantes
+ok 4 - calcula línea con descuento e impuesto sin flotantes
+  ---
+  duration_ms: 1.734345
+  type: 'test'
+  ...
+# Subtest: calcula totales de documento
+ok 5 - calcula totales de documento
+  ---
+  duration_ms: 0.499481
+  type: 'test'
+  ...
+# Subtest: saldo no permite pagos superiores
+ok 6 - saldo no permite pagos superiores
+  ---
+  duration_ms: 0.391077
+  type: 'test'
+  ...
+# Subtest: multiplicación decimal exacta
+ok 7 - multiplicación decimal exacta
+  ---
+  duration_ms: 0.184547
+  type: 'test'
+  ...
+# Subtest: valida cliente y correo
+ok 8 - valida cliente y correo
+  ---
+  duration_ms: 0.283696
+  type: 'test'
+  ...
+# Subtest: valida venta y exige clave, depósito y líneas
+ok 9 - valida venta y exige clave, depósito y líneas
+  ---
+  duration_ms: 0.474923
+  type: 'test'
+  ...
+# Subtest: valida cotización sin efectos de inventario
+ok 10 - valida cotización sin efectos de inventario
+  ---
+  duration_ms: 0.144267
+  type: 'test'
+  ...
+# (node:961) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Pinturas JAM inventory core
+    # Subtest: converts decimal values without floating point arithmetic
+    ok 1 - converts decimal values without floating point arithmetic
+      ---
+      duration_ms: 0.722926
+      type: 'test'
+      ...
+    # Subtest: calculates weighted average
+    ok 2 - calculates weighted average
+      ---
+      duration_ms: 0.564889
+      type: 'test'
+      ...
+    # Subtest: rejects invalid product prices and zero movements
+    ok 3 - rejects invalid product prices and zero movements
+      ---
+      duration_ms: 0.305149
+      type: 'test'
+      ...
+    # Subtest: requires BCV rate and operation date for USD receipts
+    ok 4 - requires BCV rate and operation date for USD receipts
+      ---
+      duration_ms: 0.152048
+      type: 'test'
+      ...
+    # Subtest: requires signed quantity difference for adjustments
+    ok 5 - requires signed quantity difference for adjustments
+      ---
+      duration_ms: 0.134392
+      type: 'test'
+      ...
+    1..5
+ok 11 - Pinturas JAM inventory core
+  ---
+  duration_ms: 3.120729
+  type: 'suite'
+  ...
+# (node:972) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Chat 3 delega las entradas de compra a la RPC de inventario de Chat 2
+ok 12 - Chat 3 delega las entradas de compra a la RPC de inventario de Chat 2
+  ---
+  duration_ms: 1.541266
+  type: 'test'
+  ...
+# Subtest: Chat 3 delega las salidas de venta a la RPC de inventario de Chat 2
+ok 13 - Chat 3 delega las salidas de venta a la RPC de inventario de Chat 2
+  ---
+  duration_ms: 0.189745
+  type: 'test'
+  ...
+# Subtest: el rol ventas sólo puede ejecutar salidas; entradas y ajustes siguen restringidos
+ok 14 - el rol ventas sólo puede ejecutar salidas; entradas y ajustes siguen restringidos
+  ---
+  duration_ms: 0.220772
+  type: 'test'
+  ...
+# Subtest: el helper de negocio exige autenticación y restringe EXECUTE a usuarios autenticados
+ok 15 - el helper de negocio exige autenticación y restringe EXECUTE a usuarios autenticados
+  ---
+  duration_ms: 0.210487
+  type: 'test'
+  ...
+# (node:983) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: la consola operativa exige sesión Supabase
+ok 16 - la consola operativa exige sesión Supabase
+  ---
+  duration_ms: 1.172732
+  type: 'test'
+  ...
+# Subtest: la consola consulta servicios reales de catálogo, inventario y área comercial
+ok 17 - la consola consulta servicios reales de catálogo, inventario y área comercial
+  ---
+  duration_ms: 0.194642
+  type: 'test'
+  ...
+# Subtest: el alta de cliente pasa por el servicio validado y no por escrituras directas
+ok 18 - el alta de cliente pasa por el servicio validado y no por escrituras directas
+  ---
+  duration_ms: 0.237296
+  type: 'test'
+  ...
+# Subtest: la consola no expone secretos de Supabase
+ok 19 - la consola no expone secretos de Supabase
+  ---
+  duration_ms: 0.248133
+  type: 'test'
+  ...
+# Subtest: el panel principal dirige acciones rápidas a las secciones operativas reales
+ok 20 - el panel principal dirige acciones rápidas a las secciones operativas reales
+  ---
+  duration_ms: 0.403906
+  type: 'test'
+  ...
+# Subtest: las opciones de operación rápida navegan al módulo en vez de cerrar sin acción
+ok 21 - las opciones de operación rápida navegan al módulo en vez de cerrar sin acción
+  ---
+  duration_ms: 0.240832
+  type: 'test'
+  ...
+# Subtest: la consola abre la sección indicada por el enlace del dashboard
+ok 22 - la consola abre la sección indicada por el enlace del dashboard
+  ---
+  duration_ms: 0.973663
+  type: 'test'
+  ...
+# Subtest: compras permite crear, aprobar y recibir mercancía usando PurchasesService
+ok 23 - compras permite crear, aprobar y recibir mercancía usando PurchasesService
+  ---
+  duration_ms: 0.180532
+  type: 'test'
+  ...
+# Subtest: cuentas por pagar registra pagos mediante el servicio y conserva la moneda de la deuda
+ok 24 - cuentas por pagar registra pagos mediante el servicio y conserva la moneda de la deuda
+  ---
+  duration_ms: 0.351027
+  type: 'test'
+  ...
+# Subtest: reportes consultan ventas, compras, cuentas y eventos pendientes desde servicios Supabase
+ok 25 - reportes consultan ventas, compras, cuentas y eventos pendientes desde servicios Supabase
+  ---
+  duration_ms: 0.382715
+  type: 'test'
+  ...
+# (node:994) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: calcula total de línea de compra con descuento
+ok 26 - calcula total de línea de compra con descuento
+  ---
+  duration_ms: 0.90506
+  type: 'test'
+  ...
+# Subtest: suma líneas de compra sin flotantes
+ok 27 - suma líneas de compra sin flotantes
+  ---
+  duration_ms: 0.251228
+  type: 'test'
+  ...
+# Subtest: calcula costo unitario neto más gastos atribuibles
+ok 28 - calcula costo unitario neto más gastos atribuibles
+  ---
+  duration_ms: 0.151207
+  type: 'test'
+  ...
+# Subtest: congela snapshot USD a VES con tasa indicada
+ok 29 - congela snapshot USD a VES con tasa indicada
+  ---
+  duration_ms: 0.195303
+  type: 'test'
+  ...
+# Subtest: rechaza descuento mayor que el importe bruto
+ok 30 - rechaza descuento mayor que el importe bruto
+  ---
+  duration_ms: 0.421664
+  type: 'test'
+  ...
+# Subtest: valida proveedor antes de llamar a la base de datos
+ok 31 - valida proveedor antes de llamar a la base de datos
+  ---
+  duration_ms: 0.31968
+  type: 'test'
+  ...
+# Subtest: valida compra, fecha y líneas con identificadores UUID
+ok 32 - valida compra, fecha y líneas con identificadores UUID
+  ---
+  duration_ms: 0.349305
+  type: 'test'
+  ...
+# Subtest: valida recepción idempotente
+ok 33 - valida recepción idempotente
+  ---
+  duration_ms: 0.241413
+  type: 'test'
+  ...
+# Subtest: valida pago a proveedor, fecha y tasa
+ok 34 - valida pago a proveedor, fecha y tasa
+  ---
+  duration_ms: 0.319379
+  type: 'test'
+  ...
+# (node:1005) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: security migration creates business-scoped audit with restricted read access
+ok 35 - security migration creates business-scoped audit with restricted read access
+  ---
+  duration_ms: 0.850247
+  type: 'test'
+  ...
+# Subtest: administration RPCs require an authenticated owner or admin and do not create Auth users
+ok 36 - administration RPCs require an authenticated owner or admin and do not create Auth users
+  ---
+  duration_ms: 0.125699
+  type: 'test'
+  ...
+# Subtest: cash opening amount is not double-counted and event imports preserve original currency
+ok 37 - cash opening amount is not double-counted and event imports preserve original currency
+  ---
+  duration_ms: 0.115343
+  type: 'test'
+  ...
+# Subtest: admin UI exposes user access management and audit review without service role
+ok 38 - admin UI exposes user access management and audit review without service role
+  ---
+  duration_ms: 0.330347
+  type: 'test'
+  ...
+# Subtest: cash read access is restricted to authorized cash roles and audit reads to admins
+ok 39 - cash read access is restricted to authorized cash roles and audit reads to admins
+  ---
+  duration_ms: 0.115523
+  type: 'test'
+  ...
+1..39
+# tests 43
+# suites 1
+# pass 43
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 779.590178

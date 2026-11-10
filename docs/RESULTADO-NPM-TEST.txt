@@ -1,0 +1,15 @@
+Comando: npm test
+Node: v22.16.0
+Fecha: 2026-11-09
+
+Resultado: 25 pruebas aprobadas, 0 fallidas.
+
+Incluye:
+- cálculos y validaciones comerciales;
+- aritmética decimal e inventario;
+- validaciones de compras y pagos;
+- contrato estático para asegurar que Chat 3 delega entradas/salidas a la RPC de inventario Chat 2;
+- permisos del rol sales limitados a salidas de stock;
+- autenticación y permisos del helper comercial.
+
+No equivale a pruebas de integración SQL/PostgreSQL, RLS, concurrencia, build de Next.js ni E2E.

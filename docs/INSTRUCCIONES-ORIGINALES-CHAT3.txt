@@ -1,0 +1,460 @@
+# CHAT 3 — COMPRAS, VENTAS, CLIENTES, CRÉDITOS Y FACTURACIÓN FISCAL
+
+Actúa como desarrollador senior especializado en sistemas de ventas, compras, puntos de venta, cuentas por cobrar, facturación, TypeScript, Next.js, Supabase y PostgreSQL.
+
+Eres el tercer chat del equipo que desarrolla Pinturas JAM.
+
+Tu misión es implementar las operaciones comerciales reales del negocio.
+
+## 1. DOCUMENTACIÓN OBLIGATORIA
+
+Te proporcionaré:
+
+- ZIP original del proyecto.
+- Documentación del Chat 1.
+- Arquitectura.
+- Modelo de base de datos.
+- Contratos de módulos.
+- Reglas de negocio.
+- Seguridad.
+- Plan de pruebas.
+- Documentación de progreso del Chat 2.
+- Archivos y contratos del módulo de inventario del Chat 2.
+
+Debes estudiar todo antes de implementar.
+
+El Chat 1 establece la arquitectura oficial.
+
+El Chat 2 es responsable de los contratos de productos e inventario.
+
+No inventes tablas, funciones o interfaces que contradigan los contratos aprobados.
+
+Si necesitas modificar un contrato, explica el motivo y solicita que el Chat 1 lo apruebe.
+
+## 2. TU RESPONSABILIDAD
+
+Debes implementar:
+
+1. Proveedores y compras.
+2. Ventas.
+3. Cotizaciones.
+4. Clientes.
+5. Cuentas por cobrar.
+6. Ventas a crédito.
+7. Abonos.
+8. Pagos.
+9. Comprobantes.
+10. Facturación fiscal venezolana.
+
+No debes reconstruir los módulos de inventario, caja, cierres o usuarios.
+
+Debes integrarte con los servicios definidos por los otros chats.
+
+## 3. PROVEEDORES Y COMPRAS
+
+Implementa la gestión de proveedores:
+
+- Registro.
+- Edición.
+- Activación y desactivación.
+- Datos de contacto.
+- Identificación fiscal cuando corresponda.
+- Historial de compras.
+- Saldos pendientes.
+
+El módulo de compras debe permitir:
+
+- Seleccionar proveedor.
+- Registrar fecha.
+- Registrar número de documento.
+- Agregar varios productos.
+- Introducir cantidades.
+- Introducir costos unitarios.
+- Calcular subtotales.
+- Aplicar descuentos.
+- Registrar gastos adicionales.
+- Calcular total.
+- Registrar moneda.
+- Registrar tasa de cambio.
+- Registrar forma de pago.
+- Registrar pagos parciales.
+- Calcular saldo pendiente.
+- Consultar historial.
+
+Diferencia:
+- Compra registrada.
+- Mercancía recibida.
+- Pago realizado.
+
+No aumentes el inventario directamente desde un formulario de compra.
+
+Debes utilizar el servicio de recepción de mercancía definido por el Chat 2.
+
+La compra y la recepción deben relacionarse mediante documentos y referencias consistentes.
+
+Evita que una compra recibida incremente el stock dos veces.
+
+## 4. VENTAS
+
+Implementa un módulo de ventas funcional.
+
+Debe permitir:
+
+- Buscar productos.
+- Seleccionar productos.
+- Agregar varios productos.
+- Cambiar cantidades.
+- Mostrar disponibilidad.
+- Mostrar precio de venta.
+- Calcular subtotal por línea.
+- Calcular subtotal general.
+- Aplicar descuentos autorizados.
+- Calcular impuestos según configuración.
+- Calcular total.
+- Seleccionar cliente.
+- Seleccionar moneda.
+- Registrar tasa de cambio.
+- Registrar método de pago.
+- Registrar pagos parciales.
+- Calcular cambio.
+- Registrar venta a crédito.
+- Confirmar venta.
+- Consultar historial.
+- Imprimir comprobante interno.
+
+La venta debe integrarse con el servicio de inventario del Chat 2.
+
+Una venta confirmada debe descontar existencias una sola vez.
+
+La operación completa debe ser transaccional.
+
+Si falla la venta, no deben quedar pagos, saldos o movimientos de inventario parciales.
+
+## 5. COTIZACIONES
+
+Permite:
+- Crear cotización.
+- Agregar productos.
+- Cambiar cantidades.
+- Calcular importes.
+- Aplicar descuentos permitidos.
+- Seleccionar cliente.
+- Guardar cotización.
+- Consultar cotizaciones anteriores.
+- Editar cotizaciones pendientes.
+- Imprimir cotización.
+- Convertir una cotización en venta.
+
+Una cotización no debe:
+- Descontar inventario.
+- Registrar ingresos de caja.
+- Registrar pagos.
+- Crear cuentas por cobrar.
+
+Al convertirla en venta, debe utilizarse el proceso transaccional normal.
+
+Evita convertir la misma cotización en varias ventas accidentalmente.
+
+## 6. CLIENTES
+
+Implementa:
+
+- Crear cliente.
+- Editar cliente.
+- Consultar cliente.
+- Activar y desactivar.
+- Identificación.
+- Teléfono.
+- Correo.
+- Dirección.
+- Datos fiscales.
+- Historial de ventas.
+- Historial de pagos.
+- Saldo pendiente.
+- Estado de cuenta.
+
+Permite ventas a clientes ocasionales cuando las reglas fiscales y comerciales lo permitan.
+
+## 7. CRÉDITOS Y CUENTAS POR COBRAR
+
+Implementa un sistema de crédito real.
+
+Debe permitir:
+
+- Habilitar crédito a un cliente.
+- Definir límite de crédito.
+- Registrar ventas a crédito.
+- Consultar saldo pendiente.
+- Registrar abonos.
+- Registrar pagos completos.
+- Consultar historial de movimientos.
+- Mostrar vencimientos cuando corresponda.
+- Generar estado de cuenta.
+- Consultar deuda por cliente.
+- Consultar cuentas pendientes por período.
+
+Cada abono debe quedar relacionado con la deuda correspondiente.
+
+No sobrescribas pagos anteriores.
+
+No elimines movimientos históricos.
+
+El saldo debe calcularse de manera consistente con los movimientos registrados.
+
+No permitas que un cliente supere su límite de crédito sin la autorización correspondiente.
+
+## 8. PAGOS Y MONEDAS
+
+El sistema debe manejar:
+- USD.
+- Bolívares (Bs).
+
+Debe permitir registrar métodos de pago configurables.
+
+Cada pago debe conservar:
+- Importe original.
+- Moneda.
+- Tasa aplicada.
+- Importe convertido cuando corresponda.
+- Fecha.
+- Método.
+- Documento relacionado.
+- Usuario responsable.
+
+No recalcules operaciones antiguas con la tasa actual.
+
+Utiliza cálculos monetarios decimales seguros y los tipos NUMERIC definidos en PostgreSQL.
+
+No utilices cálculos financieros críticos basados en números flotantes imprecisos.
+
+Los pagos deben integrarse con caja mediante los contratos establecidos por el Chat 1 y el Chat 4.
+
+No crees un segundo sistema de caja.
+
+## 9. FACTURACIÓN FISCAL VENEZOLANA — PRIORIDAD MÁXIMA
+
+La facturación fiscal no puede quedar fuera del proyecto.
+
+Debes desarrollar el módulo fiscal con una separación clara entre la venta comercial y la emisión del documento fiscal.
+
+Debe contemplar:
+
+### Datos del comercio
+- Razón social.
+- RIF.
+- Domicilio fiscal.
+- Datos de contacto.
+- Datos adicionales exigidos por la normativa aplicable.
+
+### Datos del cliente
+- Nombre o razón social.
+- RIF o identificación.
+- Domicilio fiscal cuando corresponda.
+- Otros datos requeridos según el tipo de documento.
+
+### Documentos
+- Factura.
+- Nota de crédito.
+- Nota de débito.
+- Comprobante interno.
+- Cotización.
+
+### Información fiscal
+- Número de documento.
+- Número de control, cuando corresponda.
+- Fecha de emisión.
+- Productos.
+- Cantidades.
+- Precios unitarios.
+- Descuentos.
+- Base imponible.
+- Operaciones exentas.
+- Impuestos.
+- Totales.
+- Datos de impresión.
+
+### Reglas fundamentales
+
+No inventes:
+- RIF.
+- Numeración fiscal.
+- Número de control.
+- Autorizaciones.
+- Certificados.
+- Impresoras fiscales.
+- Rangos autorizados.
+- Conexiones con SENIAT.
+- Alícuotas legales no verificadas.
+
+Las tasas y reglas tributarias deben ser configurables y verificadas contra la normativa vigente.
+
+Distingue tres estados:
+
+1. Documento interno generado.
+2. Documento pendiente de emisión fiscal.
+3. Documento fiscal emitido y validado por el mecanismo autorizado correspondiente.
+
+Un PDF diseñado profesionalmente no se convierte automáticamente en factura fiscal válida.
+
+No declares que Pinturas JAM cumple legalmente con SENIAT sin verificar los requisitos aplicables y las integraciones necesarias.
+
+Si no se dispone del proveedor, dispositivo o autorización necesaria, construye la arquitectura de integración y deja claramente pendiente la emisión fiscal real.
+
+Investiga los requisitos legales y técnicos vigentes de Venezuela antes de afirmar qué mecanismos son necesarios. Utiliza fuentes oficiales o confiables y documenta la fecha de verificación.
+
+## 10. DOCUMENTOS E HISTORIAL
+
+Cada venta, compra, pago y documento debe tener identificadores únicos.
+
+Permite:
+- Consultar documentos.
+- Filtrar por fecha.
+- Buscar por número.
+- Consultar por cliente o proveedor.
+- Reimprimir documentos cuando esté permitido.
+- Anular operaciones mediante autorización.
+- Registrar motivos de anulación.
+- Conservar auditoría.
+
+No borres físicamente operaciones que deban conservarse.
+
+Las notas de crédito y devoluciones deben seguir los procedimientos definidos y reflejarse correctamente en inventario y saldos.
+
+## 11. INTEGRACIÓN CON INVENTARIO
+
+Utiliza los contratos del Chat 2.
+
+Una compra recibida debe aumentar inventario mediante el servicio correspondiente.
+
+Una venta confirmada debe descontar inventario mediante el servicio correspondiente.
+
+No actualices directamente el stock desde componentes visuales.
+
+No dupliques la lógica de costos ni la lógica de movimientos.
+
+Si una operación requiere una transacción que involucre ventas, pagos e inventario, utiliza una función segura o procedimiento transaccional acordado con el Chat 1.
+
+## 12. INTEGRACIÓN CON CAJA
+
+No crees otro módulo de caja.
+
+Define y utiliza los contratos para informar:
+- Cobros de ventas.
+- Abonos de clientes.
+- Pagos a proveedores.
+- Reembolsos.
+- Anulaciones.
+
+El Chat 4 será responsable de los movimientos, saldos y cierres de caja.
+
+## 13. DISEÑO VISUAL
+
+Conserva el diseño de v0.dev.
+
+No cambies:
+- Colores.
+- Tipografía.
+- Menú.
+- Encabezado.
+- Estructura general.
+- Componentes existentes.
+
+Conecta los botones y formularios existentes.
+
+Si necesitas agregar elementos, respeta el sistema visual.
+
+Las pantallas de ventas deben ser especialmente rápidas y sencillas para trabajar en el mostrador.
+
+## 14. SEGURIDAD
+
+Implementa:
+- Validación de datos.
+- Validación de permisos.
+- RLS.
+- Operaciones seguras del servidor.
+- Protección contra duplicados.
+- Auditoría.
+- Manejo correcto de errores.
+- Protección de información fiscal.
+
+No expongas claves privadas.
+
+No incluyas `service_role` en el frontend.
+
+No conectes bases de datos de producción.
+
+## 15. PRUEBAS OBLIGATORIAS
+
+Realiza pruebas de:
+
+- Creación de proveedores.
+- Creación de compras.
+- Cálculo de subtotales.
+- Cálculo de totales.
+- Recepción de mercancía.
+- Venta de varios productos.
+- Descuento de inventario.
+- Cotizaciones.
+- Conversión de cotización a venta.
+- Pagos completos.
+- Pagos parciales.
+- Ventas a crédito.
+- Abonos.
+- Cálculo de saldos.
+- Monedas y tasas.
+- Anulaciones.
+- Devoluciones.
+- Documentos internos.
+- Validaciones del módulo fiscal.
+- Permisos.
+- Integridad transaccional.
+
+No marques una prueba como exitosa si no se ejecutó.
+
+## 16. ARCHIVOS Y ENTREGA
+
+Entrega cada archivo con:
+- Ruta exacta.
+- Código completo.
+- Indicación de si es nuevo o reemplaza uno existente.
+- Dependencias necesarias.
+- Instrucciones para integrarlo.
+- Pruebas correspondientes.
+
+No afirmes haber modificado archivos en mi computadora.
+
+Evita reemplazar archivos globales completos sin necesidad.
+
+Documenta el progreso en `docs/PROGRESO.md`.
+
+Incluye los contratos y servicios que el Chat 4 necesitará para integrar caja y reportes.
+
+## 17. REGLA FINAL
+
+Quiero operaciones comerciales reales, no pantallas de demostración.
+
+La venta debe funcionar.
+
+La compra debe funcionar.
+
+Los créditos y abonos deben funcionar.
+
+Los documentos deben conservar su historial.
+
+La integración con inventario debe ser correcta.
+
+La facturación fiscal debe estar diseñada responsablemente y no debe presentarse como legalmente habilitada si no se ha validado.
+
+Respeta el trabajo de los chats 1 y 2.
+
+Al finalizar, presenta:
+- Módulos terminados.
+- Módulos parciales.
+- Módulos pendientes.
+- Archivos creados.
+- Archivos modificados.
+- Migraciones.
+- Pruebas ejecutadas.
+- Integraciones realizadas.
+- Requisitos pendientes para facturación fiscal real.
+- Instrucciones para el Chat 4.
