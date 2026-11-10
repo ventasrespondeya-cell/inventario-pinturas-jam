@@ -9,7 +9,7 @@ import type { ProductInput } from '@/lib/modules/inventory/types'
 import { calculateDocument } from '@/lib/modules/commercial/calculations'
 import type { CommercialLineInput, Currency } from '@/lib/modules/commercial/types'
 import { PurchasesService } from '@/lib/modules/purchases'
-import type { User } from '@supabase/supabase-js'
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 
 type Section = 'Inventario' | 'Clientes' | 'Proveedores' | 'Compras' | 'Ventas' | 'Cotizaciones' | 'Cuentas por cobrar' | 'Cuentas por pagar' | 'Reportes'
 type Row = Record<string, unknown>
@@ -105,13 +105,14 @@ export default function OperationsPage() {
 
   useEffect(() => {
     let mounted = true
-    db.auth.getSession().then(({ data, error }) => {
+    db.auth.getSession().then((response: Awaited<ReturnType<typeof db.auth.getSession>>) => {
+      const { data, error } = response;
       if (!mounted) return
       if (error) setMessage(error.message)
       setUser(data.session?.user ?? null)
       setReady(true)
-    }).catch((e) => { if (mounted) { setMessage(errorText(e)); setReady(true) } })
-    const { data: listener } = db.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null))
+    }).catch((e: unknown) => { if (mounted) { setMessage(errorText(e)); setReady(true) } })
+    const { data: listener } = db.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => setUser(session?.user ?? null))
     return () => { mounted = false; listener.subscription.unsubscribe() }
   }, [db])
 
@@ -129,10 +130,10 @@ export default function OperationsPage() {
     let mounted = true
     Promise.all([purchases.listSuppliers(), catalog.listProducts(), inventory.warehouses(), purchases.listPayables(), commercial.listPaymentMethods()]).then(([suppliers, products, stockrooms, payables, methods]) => {
       if (!mounted) return
-      if (suppliers.ok) { setPurchaseSuppliers(suppliers.data as Row[]); if (!purchaseSupplier && suppliers.data[0]) setPurchaseSupplier(String((suppliers.data[0] as Row).id)) }
+      if (suppliers.ok) { setPurchaseSuppliers(suppliers.data as unknown as Row[]); if (!purchaseSupplier && suppliers.data[0]) setPurchaseSupplier(String((suppliers.data[0] as unknown as Row).id)) }
       if (products.ok) setPurchaseProducts(products.data as Row[])
       if (stockrooms.ok) { setPurchaseWarehouses(stockrooms.data as Row[]); if (!receiptWarehouse && stockrooms.data[0]) setReceiptWarehouse(String((stockrooms.data[0] as Row).id)) }
-      if (payables.ok) { setPayableRows(payables.data as Row[]); if (!selectedPayable && payables.data[0]) setSelectedPayable(String((payables.data[0] as Row).id)) }
+      if (payables.ok) { setPayableRows(payables.data as unknown as Row[]); if (!selectedPayable && payables.data[0]) setSelectedPayable(String((payables.data[0] as unknown as Row).id)) }
       if (methods.ok) { setSupplierPaymentMethods((methods.data as Row[]).filter(x => x.active !== false)); if (!supplierPayMethod && methods.data[0]) setSupplierPayMethod(String((methods.data[0] as Row).name)) }
     }).catch(e => setMessage(errorText(e)))
     return () => { mounted = false }
@@ -157,8 +158,12 @@ export default function OperationsPage() {
     try {
       if (section === 'Reportes') {
         const [sales, buys, recv, pay, events] = await Promise.all([commercial.listSales(reportFrom, reportTo), purchases.listPurchases({ from: reportFrom, to: reportTo }), commercial.listReceivables(), purchases.listPayables(), commercial.listCashEventsPending(500)])
-        for (const item of [sales, buys, recv, pay, events]) if (!item.ok) throw new Error(item.error.message)
-        setReportSales(sales.data as Row[]); setReportPurchases(buys.data as Row[]); setReportReceivables(recv.data as Row[]); setReportPayables(pay.data as Row[]); setReportCashPending((events.data as Row[]).length)
+        if (!sales.ok) throw new Error(sales.error.message)
+        if (!buys.ok) throw new Error(buys.error.message)
+        if (!recv.ok) throw new Error(recv.error.message)
+        if (!pay.ok) throw new Error(pay.error.message)
+        if (!events.ok) throw new Error(events.error.message)
+        setReportSales(sales.data as unknown as Row[]); setReportPurchases(buys.data as unknown as Row[]); setReportReceivables(recv.data as unknown as Row[]); setReportPayables(pay.data as unknown as Row[]); setReportCashPending((events.data as unknown as Row[]).length)
         setRows([]); return
       }
       let result
@@ -180,7 +185,8 @@ export default function OperationsPage() {
         }
         if (!result) throw new Error('No se pudo preparar la consulta.')
         if (!result.ok) throw new Error(result.error.message)
-        setRows(Array.isArray(result.data) ? result.data as Row[] : result.data ? [result.data as Row] : [])
+        const resultData = (result as { data?: unknown }).data
+        setRows(Array.isArray(resultData) ? resultData as Row[] : resultData ? [resultData as Row] : [])
       }
     } catch (e) { setRows([]); setMessage(errorText(e)) }
     finally { setBusy(false) }
@@ -292,7 +298,7 @@ export default function OperationsPage() {
     setSupplierName(''); setSupplierTaxId(''); setSupplierPhone('')
     setMessage('Proveedor guardado correctamente.')
     const refreshed = await purchases.listSuppliers()
-    if (refreshed.ok) { setPurchaseSuppliers(refreshed.data as Row[]); await load() }
+    if (refreshed.ok) { setPurchaseSuppliers(refreshed.data as unknown as Row[]); await load() }
   }
 
   function addPurchaseLine(e: FormEvent) {
@@ -357,7 +363,7 @@ export default function OperationsPage() {
     if (!result.ok) { setMessage(result.error.message); return }
     setSupplierPayAmount(''); setSupplierPayReference(''); setMessage('Pago al proveedor registrado. Se generó el evento para su integración con caja.');
     const refreshed = await purchases.listPayables()
-    if (refreshed.ok) setPayableRows(refreshed.data as Row[])
+    if (refreshed.ok) setPayableRows(refreshed.data as unknown as Row[])
     await load()
   }
 
@@ -440,6 +446,6 @@ export default function OperationsPage() {
     {section === 'Reportes' && <div className="mt-5 space-y-5"><div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 p-4"><label className="text-sm">Desde<input type="date" value={reportFrom} onChange={e=>setReportFrom(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Hasta<input type="date" value={reportTo} onChange={e=>setReportTo(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={()=>void load()} disabled={busy || reportFrom>reportTo} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Generar reporte</button></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[{label:'Ventas registradas',value:String(reportSales.length)},{label:'Compras registradas',value:String(reportPurchases.length)},{label:'Cuentas por cobrar',value:String(reportReceivables.length)},{label:'Cuentas por pagar',value:String(reportPayables.length)}].map(x=><div key={x.label} className="rounded-xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">{x.label}</p><p className="mt-2 text-3xl font-bold">{x.value}</p></div>)}</div><div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Eventos comerciales pendientes de sincronizar: {reportCashPending}.</strong><p className="mt-1">Son cobros y pagos aún no importados a un turno de caja de la misma moneda. Abre caja y ejecuta la sincronización para incorporarlos al arqueo.</p></div><div className="grid gap-4 lg:grid-cols-2"><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Ventas del período</h2><p className="mt-1 text-xs text-slate-500">Listado real desde Supabase; importes separados por moneda.</p><div className="mt-3 space-y-2">{reportSales.length?reportSales.map((r,i)=><div key={String(r.id??i)} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{String(r.sale_number??r.id??'Venta')} · {String(r.sale_date??'')}</span><strong>{String(r.total??'—')} {String(r.currency??'')}</strong></div>):<p className="text-sm text-slate-500">Sin ventas en el período.</p>}</div></div><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Compras del período</h2><p className="mt-1 text-xs text-slate-500">Listado real desde Supabase; importes separados por moneda.</p><div className="mt-3 space-y-2">{reportPurchases.length?reportPurchases.map((r,i)=><div key={String(r.id??i)} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{String(r.document_number??r.id??'Compra')} · {String(r.document_date??'')}</span><strong>{String(r.total??'—')} {String(r.currency??'')}</strong></div>):<p className="text-sm text-slate-500">Sin compras en el período.</p>}</div></div></div></div>}
     {section === 'Clientes' && <form onSubmit={createCustomer} className="mt-5 grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4"><label className="text-sm">Nombre *<input required value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Documento<input value={customerDocument} onChange={(e) => setCustomerDocument(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Teléfono<input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><button disabled={busy} className="self-end rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Guardar cliente</button></form>}
     {message && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{message}</p>}
-    <div className="mt-5 overflow-x-auto">{busy ? <p className="p-8 text-center text-sm text-slate-500">Consultando…</p> : visibleRows.length === 0 ? <div className="p-10 text-center"><p className="font-semibold">No hay registros para mostrar</p><p className="mt-1 text-sm text-slate-500">Puede que aún no existan datos, que falte aplicar la migración correspondiente o que tu usuario no tenga acceso al negocio.</p></div> : <table className="w-full min-w-[640px] border-collapse text-left text-sm"><thead><tr>{columns.map((c) => <th key={c} className="border-b border-slate-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{visibleRows.map((r,i) => <tr key={String(r.id ?? i)} onClick={section === 'Compras' ? () => void openPurchase(String(r.id)) : undefined} className={`odd:bg-slate-50 ${section === 'Compras' ? 'cursor-pointer hover:bg-orange-50' : ''}`}>{columns.map((c) => <td key={c} className="max-w-xs border-b border-slate-100 px-3 py-3 text-slate-700">{c === 'category_id' ? (categories.find((cat) => String(cat.id) === String(r[c]))?.name ?? 'Sin categoría') : pretty(r[c])}</td>)}</tr>)}</tbody></table>}</div>
+    <div className="mt-5 overflow-x-auto">{busy ? <p className="p-8 text-center text-sm text-slate-500">Consultando…</p> : visibleRows.length === 0 ? <div className="p-10 text-center"><p className="font-semibold">No hay registros para mostrar</p><p className="mt-1 text-sm text-slate-500">Puede que aún no existan datos, que falte aplicar la migración correspondiente o que tu usuario no tenga acceso al negocio.</p></div> : <table className="w-full min-w-[640px] border-collapse text-left text-sm"><thead><tr>{columns.map((c) => <th key={c} className="border-b border-slate-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{visibleRows.map((r,i) => <tr key={String(r.id ?? i)} onClick={section === 'Compras' ? () => void openPurchase(String(r.id)) : undefined} className={`odd:bg-slate-50 ${section === 'Compras' ? 'cursor-pointer hover:bg-orange-50' : ''}`}>{columns.map((c) => <td key={c} className="max-w-xs border-b border-slate-100 px-3 py-3 text-slate-700">{c === 'category_id' ? (String(categories.find((cat) => String(cat.id) === String(r[c]))?.name ?? 'Sin categoría')) : pretty(r[c])}</td>)}</tr>)}</tbody></table>}</div>
     </section><p className="mt-4 text-xs text-slate-500">Reportes consultan ventas, compras y saldos directamente desde Supabase. Ventas y cotizaciones cuentan con formularios conectados a los RPC comerciales; la confirmación de venta descuenta inventario de forma transaccional. Caja y cierres cuentan con su módulo transaccional; la factura fiscal requiere emisor autorizado y validación legal.</p><div className="mt-4 flex flex-wrap gap-4"><a href="/caja" className="inline-block text-sm font-semibold text-orange-700 underline">Abrir caja y cierres</a><a href="/administracion" className="inline-block text-sm font-semibold text-orange-700 underline">Administración y auditoría</a><a href="/" className="inline-block text-sm text-orange-700 underline">Volver al panel visual</a></div></div></main>
 }
