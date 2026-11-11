@@ -42,7 +42,7 @@ export default function CashPage() {
     } else { setSummary(null); setMovements([]) }
   }, [cash])
 
-  useEffect(() => { let live = true; db.auth.getSession().then(({ data }) => { if (!live) return; if (!data.session) router.replace('/'); else { setReady(true); void refresh() } }); return () => { live = false } }, [db, router, refresh])
+  useEffect(() => { let live = true; db.auth.getSession().then(({ data }: { data: { session: object | null } }) => { if (!live) return; if (!data.session) router.replace('/'); else { setReady(true); void refresh() } }); return () => { live = false } }, [db, router, refresh])
 
   async function run(action: () => Promise<{ok: boolean; data?: unknown; error?: {message: string}}>, success: string) {
     setBusy(true); setError(''); setMessage('')
