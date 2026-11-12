@@ -12,9 +12,9 @@ import type { CommercialLineInput, Currency } from '@/lib/modules/commercial/typ
 import { PurchasesService } from '@/lib/modules/purchases'
 import type { User } from '@supabase/supabase-js'
 
-type Section = 'Inventario' | 'Compras' | 'Ventas' | 'Cotizaciones' | 'Cuentas por cobrar' | 'Cuentas por pagar' | 'Reportes'
+type Section = 'Inventario' | 'Compras' | 'Cotizaciones' | 'Cuentas' | 'Resumen del negocio'
 type Row = Record<string, unknown>
-const sections: Section[] = ['Inventario', 'Compras', 'Ventas', 'Cotizaciones', 'Cuentas por cobrar', 'Cuentas por pagar', 'Reportes']
+const sections: Section[] = ['Inventario', 'Compras', 'Cotizaciones', 'Cuentas', 'Resumen del negocio']
 const errorText = (e: unknown) => e instanceof Error ? e.message : 'Ocurrió un error inesperado.'
 const pretty = (v: unknown) => v == null || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v)
 
@@ -59,9 +59,7 @@ export default function OperationsPage() {
   const [paymentMethods, setPaymentMethods] = useState<Row[]>([])
   const [saleWarehouse, setSaleWarehouse] = useState('')
   const [saleCustomer, setSaleCustomer] = useState('')
-  const [saleCurrency, setSaleCurrency] = useState<Currency>('VES')
-  const [salePaymentMethod, setSalePaymentMethod] = useState('')
-  const [salePaymentAmount, setSalePaymentAmount] = useState('')
+  const [saleCurrency] = useState<Currency>('USD')
   const [saleNotes, setSaleNotes] = useState('')
   const [cartProduct, setCartProduct] = useState('')
   const [cartQuantity, setCartQuantity] = useState('1')
@@ -74,7 +72,6 @@ export default function OperationsPage() {
   const [purchaseSupplier, setPurchaseSupplier] = useState('')
   const [purchaseDocument, setPurchaseDocument] = useState('')
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0, 10))
-  const [purchaseCurrency, setPurchaseCurrency] = useState<Currency>('VES')
   const [purchaseNotes, setPurchaseNotes] = useState('')
   const [purchaseProduct, setPurchaseProduct] = useState('')
   const [purchaseQuantity, setPurchaseQuantity] = useState('1')
@@ -86,6 +83,13 @@ export default function OperationsPage() {
   const [receiptWarehouse, setReceiptWarehouse] = useState('')
   const [payableRows, setPayableRows] = useState<Row[]>([])
   const [selectedPayable, setSelectedPayable] = useState('')
+  const [accountView, setAccountView] = useState<'receivable' | 'payable'>('receivable')
+  const [selectedReceivable, setSelectedReceivable] = useState('')
+  const [customerPayAmount, setCustomerPayAmount] = useState('')
+  const [customerPayMethod, setCustomerPayMethod] = useState('')
+  const [customerPayReference, setCustomerPayReference] = useState('')
+  const [bcvRate, setBcvRate] = useState<number | null>(null)
+  const [bcvRateId, setBcvRateId] = useState('')
   const [supplierPayAmount, setSupplierPayAmount] = useState('')
   const [supplierPayMethod, setSupplierPayMethod] = useState('')
   const [supplierPayReference, setSupplierPayReference] = useState('')
@@ -134,22 +138,25 @@ export default function OperationsPage() {
   }, [user, catalog])
 
   useEffect(() => {
-    if (!user || (section !== 'Compras' && section !== 'Cuentas por pagar')) return
+    if (!user || (section !== 'Compras' && section !== 'Cuentas')) return
     let mounted = true
-    Promise.all([purchases.listSuppliers(), catalog.listProducts(), inventory.warehouses(), purchases.listPayables(), commercial.listPaymentMethods()]).then(([suppliers, products, stockrooms, payables, methods]) => {
+    Promise.all([purchases.listSuppliers(), catalog.listProducts(), inventory.warehouses(), purchases.listPayables(), commercial.listPaymentMethods(), commercial.listReceivables(), commercial.listCustomers()]).then(([suppliers, products, stockrooms, payables, methods, receivables, customers]) => {
       if (!mounted) return
       if (suppliers.ok) { setPurchaseSuppliers(suppliers.data as unknown as Row[]); if (!purchaseSupplier && suppliers.data[0]) setPurchaseSupplier(String((suppliers.data[0] as unknown as Row).id)) }
       if (products.ok) setPurchaseProducts(products.data as Row[])
       if (stockrooms.ok) { setPurchaseWarehouses(stockrooms.data as Row[]); if (!receiptWarehouse && stockrooms.data[0]) setReceiptWarehouse(String((stockrooms.data[0] as Row).id)) }
       if (payables.ok) { setPayableRows(payables.data as unknown as Row[]); if (!selectedPayable && payables.data[0]) setSelectedPayable(String((payables.data[0] as unknown as Row).id)) }
-      if (methods.ok) { setSupplierPaymentMethods((methods.data as Row[]).filter(x => x.active !== false)); if (!supplierPayMethod && methods.data[0]) setSupplierPayMethod(String((methods.data[0] as Row).name)) }
+      if (methods.ok) { const activeMethods = (methods.data as Row[]).filter(x => x.active !== false); setPaymentMethods(activeMethods); setSupplierPaymentMethods(activeMethods); if (!supplierPayMethod && activeMethods[0]) setSupplierPayMethod(String(activeMethods[0].name)); if (!customerPayMethod && activeMethods[0]) setCustomerPayMethod(String(activeMethods[0].name)) }
+      if (receivables.ok) { const items = receivables.data as Row[]; setReportReceivables(items); if (!selectedReceivable && items[0]) setSelectedReceivable(String(items[0].id)) }
+      if (customers.ok) setCustomerRows(customers.data as Row[])
     }).catch(e => setMessage(errorText(e)))
     return () => { mounted = false }
-  }, [user, section, purchases, catalog, inventory])
+  }, [user, section, purchases, catalog, inventory, commercial])
 
   useEffect(() => {
     if (!user || section !== 'Inventario') return
     let mounted = true
+    purchases.getExchangeRate(new Date().toISOString().slice(0,10)).then(rate => { if (mounted && rate.ok) { setBcvRate(Number(rate.data.rate)); setBcvRateId(String(rate.data.id)) } })
     inventory.warehouses().then((result) => {
       if (!mounted) return
       if (result.ok) {
@@ -159,7 +166,7 @@ export default function OperationsPage() {
       } else setMessage(result.error.message)
     }).catch((e: unknown) => setMessage(errorText(e)))
     return () => { mounted = false }
-  }, [user, section, inventory])
+  }, [user, section, inventory, purchases])
 
   useEffect(() => {
     if (!user || section !== 'Inventario' || inventoryView !== 'movements') return
@@ -173,23 +180,25 @@ export default function OperationsPage() {
   }, [user, section, inventoryView, inventory])
 
   useEffect(() => {
-    if (!user || (section !== 'Ventas' && section !== 'Cotizaciones')) return
+    if (!user || section !== 'Cotizaciones') return
     let mounted = true
-    Promise.all([catalog.listProducts(), inventory.warehouses(), commercial.listCustomers(), commercial.listPaymentMethods()]).then(([p, w, c, m]) => {
+    Promise.all([catalog.listProducts(), inventory.warehouses(), commercial.listCustomers(), commercial.listPaymentMethods()]).then(async ([p, w, c, m]) => {
       if (!mounted) return
       if (p.ok) setSaleProducts(p.data as Row[])
       if (w.ok) { setWarehouses(w.data as Row[]); if (!saleWarehouse && w.data[0]) setSaleWarehouse(String((w.data[0] as Row).id)) }
       if (c.ok) setCustomerRows(c.data as Row[])
-      if (m.ok) { setPaymentMethods((m.data as Row[]).filter(x => x.active !== false)); if (!salePaymentMethod && m.data[0]) setSalePaymentMethod(String((m.data[0] as Row).name)) }
+      if (m.ok) setPaymentMethods((m.data as Row[]).filter(x => x.active !== false))
+      const rate = await purchases.getExchangeRate(new Date().toISOString().slice(0,10))
+      if (rate.ok) { setBcvRate(Number(rate.data.rate)); setBcvRateId(String(rate.data.id)) }
     }).catch(e => setMessage(errorText(e)))
     return () => { mounted = false }
-  }, [user, section, catalog, inventory, commercial])
+  }, [user, section, catalog, inventory, commercial, purchases])
 
   const load = useCallback(async () => {
     if (!user) return
     setBusy(true); setMessage('')
     try {
-      if (section === 'Reportes') {
+      if (section === 'Resumen del negocio') {
         const [sales, buys, recv, pay, events] = await Promise.all([commercial.listSales(reportFrom, reportTo), purchases.listPurchases({ from: reportFrom, to: reportTo }), commercial.listReceivables(), purchases.listPayables(), commercial.listCashEventsPending(500)])
         if (!sales.ok) throw new Error(sales.error.message)
         if (!buys.ok) throw new Error(buys.error.message)
@@ -199,6 +208,14 @@ export default function OperationsPage() {
         setReportSales(sales.data as Row[]); setReportPurchases(buys.data as unknown as Row[]); setReportReceivables(recv.data as Row[]); setReportPayables(pay.data as unknown as Row[]); setReportCashPending((events.data as Row[]).length)
         setRows([]); return
       }
+      if (section === 'Cuentas') {
+        const [recv, pay] = await Promise.all([commercial.listReceivables(), purchases.listPayables()])
+        if (!recv.ok) throw new Error(recv.error.message)
+        if (!pay.ok) throw new Error(pay.error.message)
+        setReportReceivables(recv.data as Row[]); setPayableRows(pay.data as unknown as Row[])
+        setRows((accountView === 'receivable' ? recv.data : pay.data) as Row[])
+        return
+      }
       let result
       if (section === 'Inventario') {
         const [products, stock] = await Promise.all([catalog.listProducts(search, true), inventory.stock(search)])
@@ -207,20 +224,18 @@ export default function OperationsPage() {
         const stockByProduct = new Map<string, Row>()
         for (const item of stock.data as Row[]) {
           const id = String(item.product_id ?? item.productId)
-          const current = stockByProduct.get(id) ?? { quantity: 0, minimum_stock: 0, warehouse_count: 0 }
+          const current = stockByProduct.get(id) ?? { quantity: 0, minimum_stock: 0, warehouse_count: 0, value_ves: 0 }
           current.quantity = Number(current.quantity ?? 0) + Number(item.quantity ?? 0)
           current.minimum_stock = Number(current.minimum_stock ?? 0) + Number(item.minimum_stock ?? 0)
           current.warehouse_count = Number(current.warehouse_count ?? 0) + 1
+          current.value_ves = Number(current.value_ves ?? 0) + Number(item.quantity ?? 0) * Number(item.average_cost_ves ?? 0)
           stockByProduct.set(id, current)
         }
-        setRows((products.data as Row[]).map((p) => ({ ...p, ...(stockByProduct.get(String(p.id)) ?? { quantity: 0, minimum_stock: 0, warehouse_count: 0 }) })))
+        setRows((products.data as Row[]).map((p) => ({ ...p, ...(stockByProduct.get(String(p.id)) ?? { quantity: 0, minimum_stock: 0, warehouse_count: 0, value_ves: 0 }) })))
       } else {
         switch (section) {
           case 'Compras': result = await purchases.listPurchases({}); break
-          case 'Ventas': result = await commercial.listSales(); break
           case 'Cotizaciones': result = await commercial.listQuotes(); break
-          case 'Cuentas por cobrar': result = await commercial.listReceivables(); break
-          case 'Cuentas por pagar': result = await purchases.listPayables(); break
         }
         if (!result) throw new Error('No se pudo preparar la consulta.')
         if (!result.ok) throw new Error(result.error.message)
@@ -228,7 +243,7 @@ export default function OperationsPage() {
       }
     } catch (e) { setRows([]); setMessage(errorText(e)) }
     finally { setBusy(false) }
-  }, [user, section, search, catalog, inventory, commercial, purchases, reportFrom, reportTo])
+  }, [user, section, search, catalog, inventory, commercial, purchases, reportFrom, reportTo, accountView])
 
   useEffect(() => { void load() }, [load])
 
@@ -360,6 +375,21 @@ export default function OperationsPage() {
     setMessage(active ? 'Categoría desactivada.' : 'Categoría reactivada.')
   }
 
+  async function confirmQuote(quote: Row) {
+    const customerId = String(quote.customer_id ?? quote.customerId ?? '')
+    if (!customerId) { setMessage('Esta cotización necesita un cliente para generar la cuenta por cobrar.'); return }
+    if (!saleWarehouse) { setMessage('No hay un depósito activo para registrar la salida de mercancía.'); return }
+    const lines = (Array.isArray(quote.lines) ? quote.lines as Row[] : []).map(line => ({ productId: String(line.product_id ?? line.productId), description: String(line.description ?? ''), quantity: String(line.quantity), unitPrice: String(line.unit_price ?? line.unitPrice), discountAmount: String(line.discount_amount ?? line.discountAmount ?? 0) }))
+    if (!lines.length) { setMessage('La cotización no tiene productos para confirmar.'); return }
+    if (!bcvRate || !bcvRateId) { setMessage('Se necesita la tasa BCV del día para confirmar la cotización en USD.'); return }
+    setBusy(true); setMessage('')
+    const result = await commercial.confirmSale({ idempotencyKey: 'quote:' + String(quote.id), quoteId: String(quote.id), customerId, warehouseId: saleWarehouse, currency: 'USD', exchangeRate: String(bcvRate), exchangeRateId: bcvRateId, lines, payments: [], notes: String(quote.notes ?? '') || null })
+    setBusy(false)
+    if (!result.ok) { setMessage(result.error.message); return }
+    setMessage('Operación confirmada: se descontó el inventario y se creó la cuenta por cobrar. Los pagos se registran desde Cuentas.')
+    await load()
+  }
+
   function addCartLine(e: FormEvent) {
     e.preventDefault()
     const product = saleProducts.find(p => String(p.id) === cartProduct)
@@ -375,25 +405,13 @@ export default function OperationsPage() {
   }
 
   async function saveQuote() {
+    if (!saleCustomer) { setMessage('Selecciona el cliente de la cotización.'); return }
     if (!cart.length) { setMessage('Agrega productos antes de guardar la cotización.'); return }
     setBusy(true); setMessage('')
     const result = await commercial.saveQuote({ customerId: saleCustomer || null, currency: saleCurrency, lines: cart, notes: saleNotes || null })
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
     setCart([]); setSaleNotes(''); setMessage('Cotización guardada correctamente.'); await load()
-  }
-
-  async function confirmSale() {
-    if (!cart.length || !saleWarehouse) { setMessage('Agrega productos y selecciona un depósito.'); return }
-    const total = documentTotal()
-    const payments = salePaymentAmount.trim() && salePaymentMethod ? [{ amount: salePaymentAmount.trim(), currency: saleCurrency, method: salePaymentMethod, paymentDate: new Date().toISOString().slice(0,10) }] : []
-    if (payments.length && Number(salePaymentAmount) > Number(total)) { setMessage('El pago no puede superar el total de la venta.'); return }
-    if (!payments.length && !saleCustomer) { setMessage('Una venta a crédito requiere seleccionar un cliente con crédito autorizado.'); return }
-    setBusy(true); setMessage('')
-    const result = await commercial.confirmSale({ idempotencyKey: crypto.randomUUID(), customerId: saleCustomer || null, warehouseId: saleWarehouse, currency: saleCurrency, lines: cart, payments, notes: saleNotes || null })
-    setBusy(false)
-    if (!result.ok) { setMessage(result.error.message); return }
-    setCart([]); setSaleNotes(''); setSalePaymentAmount(''); setMessage('Venta confirmada. Se registró el movimiento de inventario y los cobros informados.'); await load()
   }
 
   function addPurchaseLine(e: FormEvent) {
@@ -409,9 +427,10 @@ export default function OperationsPage() {
   }
 
   async function createPurchase() {
-    if (!purchaseSupplier || !purchaseDocument.trim() || !purchaseDate || !purchaseLines.length) { setMessage('Completa proveedor, documento, fecha y al menos un producto.'); return }
+    const documentNumber = purchaseDocument.trim() || 'COMP-' + Date.now()
+    if (!purchaseSupplier || !purchaseDate || !purchaseLines.length) { setMessage('Selecciona proveedor y agrega al menos un producto.'); return }
     setBusy(true); setMessage('')
-    const result = await purchases.createPurchase({ supplierId: purchaseSupplier, documentNumber: purchaseDocument.trim(), documentDate: purchaseDate, currency: purchaseCurrency, notes: purchaseNotes || null, lines: purchaseLines.map(({ productId, description, quantity, unitCost, discountAmount, attributableExpenses }) => ({ productId, description, quantity, unitCost, discountAmount, attributableExpenses })) })
+    const result = await purchases.createPurchase({ supplierId: purchaseSupplier, documentNumber, documentDate: purchaseDate, currency: 'USD', notes: purchaseNotes || null, lines: purchaseLines.map(({ productId, description, quantity, unitCost }) => ({ productId, description, quantity, unitCost, discountAmount: '0', attributableExpenses: '0' })) })
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
     setPurchaseLines([]); setPurchaseDocument(''); setPurchaseNotes(''); setMessage('Compra creada en borrador. Debe aprobarse antes de recibir mercancía.'); await load()
@@ -449,6 +468,19 @@ export default function OperationsPage() {
     await openPurchase(String(purchaseDetail.id)); await load()
   }
 
+  async function registerCustomerPayment() {
+    const receivable = reportReceivables.find(row => String(row.id) === selectedReceivable)
+    if (!receivable || !customerPayAmount.trim() || !customerPayMethod) { setMessage('Selecciona una cuenta, método e importe.'); return }
+    setBusy(true); setMessage('')
+    const result = await commercial.registerCustomerPayment({ receivableId: String(receivable.id), amount: customerPayAmount.trim(), currency: String(receivable.currency) as Currency, paymentDate: new Date().toISOString().slice(0,10), method: customerPayMethod, reference: customerPayReference.trim() || null, idempotencyKey: crypto.randomUUID() })
+    setBusy(false)
+    if (!result.ok) { setMessage(result.error.message); return }
+    setCustomerPayAmount(''); setCustomerPayReference(''); setMessage('Abono registrado. La cuenta y el evento para caja se actualizaron automáticamente.')
+    const refreshed = await commercial.listReceivables()
+    if (refreshed.ok) setReportReceivables(refreshed.data as Row[])
+    await load()
+  }
+
   async function registerSupplierPayment() {
     const payable = payableRows.find(row => String(row.id) === selectedPayable)
     if (!payable || !supplierPayAmount.trim() || !supplierPayMethod) { setMessage('Selecciona una cuenta por pagar, método e importe.'); return }
@@ -463,23 +495,28 @@ export default function OperationsPage() {
   }
 
   const columns = useMemo(() => {
-    const preferred: Record<Section, string[]> = {
-      Inventario: ['name','category_id','presentation','color','sale_price','quantity','minimum_stock','stock_status','actions'],
-      Compras: ['document_number','document_date','currency','status','total','created_at'],
-      Ventas: ['sale_number','sale_date','currency','status','total','created_at'],
-      Cotizaciones: ['quote_number','quote_date','currency','status','total','valid_until'],
-      'Cuentas por cobrar': ['customer_name','currency','original_amount','balance','status','due_date'],
-      'Cuentas por pagar': ['supplier_id','currency','original_amount','paidAmount','balance','status','created_at'],
-      Reportes: [],
-    }
     const keys = new Set(rows.flatMap((r) => Object.keys(r)))
+    if (section === 'Cuentas') return (accountView === 'receivable' ? ['customer_id','currency','original_amount','paidAmount','balance','status','due_date'] : ['supplier_id','currency','original_amount','paidAmount','balance','status','created_at']).filter(k => keys.has(k))
+    const preferred: Record<Section, string[]> = {
+      Inventario: ['name','category_id','presentation','color','sale_price','quantity','minimum_stock','stock_status','inventory_value','actions'],
+      Compras: ['document_number','document_date','currency','status','total','created_at'],
+      Cotizaciones: ['quote_number','quote_date','currency','status','total','valid_until','actions'],
+      Cuentas: [],
+      'Resumen del negocio': [],
+    }
     const selected = preferred[section].filter((k) => k === 'stock_status' || k === 'actions' || keys.has(k))
     return selected.length ? selected : [...keys].slice(0, 7)
-  }, [rows, section])
+  }, [rows, section, accountView])
 
   const inventoryRows = useMemo(() => rows.filter((r) => showInactive || r.active !== false), [rows, showInactive])
-  const inventoryStats = useMemo(() => ({ total: inventoryRows.length, units: inventoryRows.reduce((sum, r) => sum + Number(r.quantity ?? 0), 0), low: inventoryRows.filter((r) => r.active !== false && Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0)).length, out: inventoryRows.filter((r) => r.active !== false && Number(r.quantity ?? 0) <= 0).length }), [inventoryRows])
+  const inventoryStats = useMemo(() => ({ total: inventoryRows.length, units: inventoryRows.reduce((sum, r) => sum + Number(r.quantity ?? 0), 0), valueUsd: bcvRate && bcvRate > 0 ? inventoryRows.reduce((sum, r) => sum + Number(r.value_ves ?? 0), 0) / bcvRate : null, low: inventoryRows.filter((r) => r.active !== false && Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0)).length, out: inventoryRows.filter((r) => r.active !== false && Number(r.quantity ?? 0) <= 0).length }), [inventoryRows, bcvRate])
 
+  const topSellingProducts = useMemo(() => {
+    const totals = new Map<string, { name: string; quantity: number }>()
+    for (const sale of reportSales) for (const line of (Array.isArray(sale.lines) ? sale.lines as Row[] : [])) { const key = String(line.product_id ?? line.description ?? 'Producto'); const current = totals.get(key) ?? { name: String(line.description ?? 'Producto'), quantity: 0 }; current.quantity += Number(line.quantity ?? 0); totals.set(key, current) }
+    return [...totals.values()].sort((a,b) => b.quantity - a.quantity).slice(0,5)
+  }, [reportSales])
+  const sumCurrency = (items: Row[], field: string, currency: string) => items.filter(x => String(x.currency ?? '') === currency).reduce((sum,x) => sum + Number(x[field] ?? 0),0)
   const visibleRows = useMemo(() => section === 'Inventario' && selectedCategory
     ? inventoryRows.filter((r) => String(r.category_id ?? '') === selectedCategory)
     : section === 'Inventario' && inventoryView === 'alerts' ? inventoryRows.filter((r) => r.active !== false && (Number(r.quantity ?? 0) <= 0 || (Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0))))
@@ -541,6 +578,7 @@ export default function OperationsPage() {
        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Unidades disponibles</p><p className="mt-2 text-2xl font-bold">{inventoryStats.units.toLocaleString('es-VE')}</p><p className="mt-1 text-[11px] text-slate-400">Existencia total</p></div>
        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm"><p className="text-xs text-amber-800">Stock bajo</p><p className="mt-2 text-2xl font-bold text-amber-700">{inventoryStats.low}</p><p className="mt-1 text-[11px] text-amber-700">En el mínimo o por debajo</p></div>
        <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm"><p className="text-xs text-red-800">Agotados</p><p className="mt-2 text-2xl font-bold text-red-700">{inventoryStats.out}</p><p className="mt-1 text-[11px] text-red-700">Sin existencias</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Valor de mercancía</p><p className="mt-2 text-2xl font-bold">{inventoryStats.valueUsd === null ? '—' : 'USD ' + inventoryStats.valueUsd.toFixed(2)}</p><p className="mt-1 text-[11px] text-slate-400">Costo promedio convertido a USD</p></div>
      </div>}
     {section === 'Inventario' && <nav aria-label="Apartados de inventario" className="mb-5 flex gap-2 overflow-x-auto border-b border-slate-200 pb-2">
       {([{id:'products',label:'Productos'},{id:'categories',label:'Categorías'},{id:'minimum',label:'Stock mínimo'},{id:'movements',label:'Movimientos'},{id:'alerts',label:'Alertas'}] as const).map((tab) => <button key={tab.id} type="button" onClick={() => { setInventoryView(tab.id); setSelectedCategory('') }} aria-current={inventoryView === tab.id ? 'page' : undefined} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition ${inventoryView === tab.id ? 'bg-[#172b4d] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{tab.label}</button>)}
@@ -569,7 +607,7 @@ export default function OperationsPage() {
         <label className="text-sm">Presentación<input value={productPresentation} onChange={(e) => setProductPresentation(e.target.value)} placeholder="Galón, cuñete…" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <label className="text-sm">Unidad<select value={productUnit} onChange={(e) => setProductUnit(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="unidad">Unidad</option><option value="galón">Galón</option><option value="cuñete">Cuñete</option><option value="litro">Litro</option><option value="kilogramo">Kilogramo</option></select></label>
         <label className="text-sm">Color<input value={productColor} onChange={(e) => setProductColor(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
-        <label className="text-sm">Precio de venta<input inputMode="decimal" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} placeholder="Ej. 12.50" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+        <label className="text-sm">Precio de venta (USD)<input inputMode="decimal" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} placeholder="Ej. 12.50" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <div className="flex flex-wrap gap-2 md:col-span-4"><button disabled={busy} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{editingProduct ? "Guardar cambios" : "Guardar producto"}</button>{editingProduct && <button type="button" onClick={() => { setEditingProduct(null); setProductName(""); setProductCategory(""); setProductPresentation(""); setProductColor(""); setProductPrice("") }} className="rounded-lg border border-slate-300 px-4 py-2">Cancelar edición</button>}</div>
       </form>
         <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => setSelectedCategory('')} className="rounded-full border px-3 py-1 text-xs">Todas las categorías</button>{categories.filter((c) => c.active !== false).map((c) => <button key={String(c.id)} onClick={() => setSelectedCategory(String(c.id))} className={`rounded-full border px-3 py-1 text-xs ${selectedCategory === String(c.id) ? 'border-orange-400 bg-orange-100 text-orange-900' : 'border-slate-200 bg-white text-slate-700'}`}>{String(c.name)}</button>)}</div>
@@ -589,7 +627,7 @@ export default function OperationsPage() {
        </form>
        <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[760px] text-sm"><thead className="bg-slate-50"><tr>{['Fecha','Producto','Depósito','Tipo','Cantidad','Saldo','Motivo'].map((h) => <th key={h} className="p-3 text-left text-xs font-bold uppercase text-slate-500">{h}</th>)}</tr></thead><tbody>{movementRows.map((m) => <tr key={String(m.id)} className="border-t border-slate-100"><td className="p-3">{m.created_at ? new Date(String(m.created_at)).toLocaleString('es-VE') : '—'}</td><td className="p-3">{String(rows.find((r) => String(r.id) === String(m.product_id))?.name ?? m.product_id)}</td><td className="p-3">{String(inventoryWarehouses.find((w) => String(w.id) === String(m.warehouse_id))?.name ?? m.warehouse_id)}</td><td className="p-3">{m.movement_type === 'entry' ? 'Entrada' : m.movement_type === 'exit' ? 'Salida' : m.movement_type === 'adjustment' ? 'Ajuste' : String(m.movement_type)}</td><td className="p-3">{String(m.quantity_delta)}</td><td className="p-3">{String(m.balance_after)}</td><td className="p-3">{String(m.reason ?? '—')}</td></tr>)}</tbody></table>{movementRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">Todavía no hay movimientos registrados.</p>}</div>
      </div>}
-    {(section === 'Ventas' || section === 'Cotizaciones') && <div className="mt-5 space-y-4">
+    {(section === 'Cotizaciones' || section === 'Cotizaciones') && <div className="mt-5 space-y-4">
       <form onSubmit={addCartLine} className="grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4">
         <label className="text-sm md:col-span-2">Producto<select required value={cartProduct} onChange={e => { setCartProduct(e.target.value); const p=saleProducts.find(x=>String(x.id)===e.target.value); setCartPrice(p ? String(p.sale_price ?? '') : '') }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar producto…</option>{saleProducts.map(p=><option key={String(p.id)} value={String(p.id)}>{String(p.name)} · {String(p.sku ?? 'Sin código')}</option>)}</select></label>
         <label className="text-sm">Cantidad<input required inputMode="decimal" value={cartQuantity} onChange={e=>setCartQuantity(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>
@@ -600,9 +638,9 @@ export default function OperationsPage() {
       <div className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-3">
         <label className="text-sm">Cliente<select value={saleCustomer} onChange={e=>setSaleCustomer(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Consumidor final</option>{customerRows.map(c=><option key={String(c.id)} value={String(c.id)}>{String(c.name)}</option>)}</select></label>
         <label className="text-sm">Moneda<select value={saleCurrency} onChange={e=>setSaleCurrency(e.target.value as Currency)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="VES">Bolívares (VES)</option><option value="USD" disabled>USD (requiere tasa BCV vinculada)</option></select></label>
-        {section === 'Ventas' && <label className="text-sm">Depósito<select value={saleWarehouse} onChange={e=>setSaleWarehouse(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar depósito…</option>{warehouses.map(w=><option key={String(w.id)} value={String(w.id)}>{String(w.name)}</option>)}</select></label>}
+        {section === 'Cotizaciones' && <label className="text-sm">Depósito<select value={saleWarehouse} onChange={e=>setSaleWarehouse(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar depósito…</option>{warehouses.map(w=><option key={String(w.id)} value={String(w.id)}>{String(w.name)}</option>)}</select></label>}
         <label className="text-sm md:col-span-3">Notas<input value={saleNotes} onChange={e=>setSaleNotes(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>
-        {section === 'Ventas' && <><label className="text-sm">Método de pago<select value={salePaymentMethod} onChange={e=>setSalePaymentMethod(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Venta a crédito / sin abono</option>{paymentMethods.map(m=><option key={String(m.id)} value={String(m.name)}>{String(m.name)}</option>)}</select></label><label className="text-sm">Monto recibido<input inputMode="decimal" placeholder={`Total ${documentTotal()}`} value={salePaymentAmount} onChange={e=>setSalePaymentAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label></>}
+        {section === 'Cotizaciones' && <><label className="text-sm">Método de pago<select value={salePaymentMethod} onChange={e=>setSalePaymentMethod(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Venta a crédito / sin abono</option>{paymentMethods.map(m=><option key={String(m.id)} value={String(m.name)}>{String(m.name)}</option>)}</select></label><label className="text-sm">Monto recibido<input inputMode="decimal" placeholder={`Total ${documentTotal()}`} value={salePaymentAmount} onChange={e=>setSalePaymentAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label></>}
       </div>
       <div className="flex flex-wrap gap-2">{section === 'Cotizaciones' ? <button onClick={saveQuote} disabled={busy || !cart.length} className="rounded-lg bg-orange-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50">Guardar cotización</button> : <button onClick={confirmSale} disabled={busy || !cart.length} className="rounded-lg bg-orange-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50">Confirmar venta y descontar inventario</button>}<button type="button" onClick={()=>setCart([])} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-semibold">Vaciar operación</button></div>
       <p className="text-xs text-slate-500">Los documentos se guardan en Supabase. La venta confirmada valida existencias y registra la salida de inventario en una transacción. Los descuentos y la emisión fiscal requieren sus permisos y configuración correspondientes.</p>
@@ -615,9 +653,12 @@ export default function OperationsPage() {
       {purchaseDetail && <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold">Detalle de compra {String(purchaseDetail.document_number ?? purchaseDetail.documentNumber ?? '')}</h3><p className="text-sm text-slate-600">Estado: {String(purchaseDetail.status)} · Total: {String(purchaseDetail.total)} {String(purchaseDetail.currency)}</p></div><button onClick={()=>setPurchaseDetail(null)} className="text-sm underline">Cerrar detalle</button></div><div className="mt-3 space-y-1 text-sm">{(Array.isArray(purchaseDetail.lines)?purchaseDetail.lines as Row[]:[]).map(line=><p key={String(line.id)}>{String(line.description ?? line.product_id)} — pedido {String(line.quantity)} — recibido {String(line.received_quantity ?? 0)}</p>)}</div><div className="mt-4 flex flex-wrap items-end gap-3">{purchaseDetail.status === 'draft' && <button onClick={approveSelectedPurchase} disabled={busy} className="rounded-lg bg-slate-900 px-4 py-2 text-white">Aprobar compra</button>}{['approved','partially_received'].includes(String(purchaseDetail.status)) && <><label className="text-sm">Recibir en depósito<select value={receiptWarehouse} onChange={e=>setReceiptWarehouse(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{purchaseWarehouses.map(w=><option key={String(w.id)} value={String(w.id)}>{String(w.name)}</option>)}</select></label><button onClick={receiveSelectedPurchase} disabled={busy || !receiptWarehouse} className="rounded-lg bg-orange-600 px-4 py-2 text-white">Recibir cantidades pendientes y actualizar stock</button></>}</div></div>}
       <p className="text-xs text-slate-500">La compra se crea como borrador. Tras aprobarla, la recepción registra entradas de inventario y la cuenta por pagar dentro de una transacción; en compras USD se exige una tasa BCV previamente registrada para la fecha del documento.</p>
     </div>}
-    {section === 'Cuentas por pagar' && <div className="mt-5 rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Registrar pago a proveedor</h2><div className="mt-3 grid gap-3 md:grid-cols-4"><label className="text-sm md:col-span-2">Cuenta pendiente<select value={selectedPayable} onChange={e=>{setSelectedPayable(e.target.value);setSupplierPayAmount('')}} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar cuenta…</option>{payableRows.filter(x=>String(x.status)!=='paid').map(x=><option key={String(x.id)} value={String(x.id)}>{String(x.supplier_id)} · {String(x.balance ?? x.original_amount)} {String(x.currency)} · {String(x.status)}</option>)}</select></label><label className="text-sm">Importe<input value={supplierPayAmount} onChange={e=>setSupplierPayAmount(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Método<select value={supplierPayMethod} onChange={e=>setSupplierPayMethod(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{supplierPaymentMethods.map(m=><option key={String(m.id)} value={String(m.name)}>{String(m.name)}</option>)}</select></label><label className="text-sm md:col-span-3">Referencia<input value={supplierPayReference} onChange={e=>setSupplierPayReference(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={registerSupplierPayment} disabled={busy || !selectedPayable} className="self-end rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white">Registrar pago</button></div><p className="mt-3 text-xs text-slate-500">El pago respeta moneda, saldo y método autorizado. En cuentas USD, la base exige tasa BCV para la fecha del pago. El movimiento de caja queda en cola para el consumidor de Chat 4.</p></div>}
-    {section === 'Reportes' && <div className="mt-5 space-y-5"><div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 p-4"><label className="text-sm">Desde<input type="date" value={reportFrom} onChange={e=>setReportFrom(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Hasta<input type="date" value={reportTo} onChange={e=>setReportTo(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={()=>void load()} disabled={busy || reportFrom>reportTo} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Generar reporte</button></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[{label:'Ventas registradas',value:String(reportSales.length)},{label:'Compras registradas',value:String(reportPurchases.length)},{label:'Cuentas por cobrar',value:String(reportReceivables.length)},{label:'Cuentas por pagar',value:String(reportPayables.length)}].map(x=><div key={x.label} className="rounded-xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">{x.label}</p><p className="mt-2 text-3xl font-bold">{x.value}</p></div>)}</div><div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Eventos comerciales pendientes de sincronizar: {reportCashPending}.</strong><p className="mt-1">Son cobros y pagos aún no importados a un turno de caja de la misma moneda. Abre caja y ejecuta la sincronización para incorporarlos al arqueo.</p></div><div className="grid gap-4 lg:grid-cols-2"><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Ventas del período</h2><p className="mt-1 text-xs text-slate-500">Listado real desde Supabase; importes separados por moneda.</p><div className="mt-3 space-y-2">{reportSales.length?reportSales.map((r,i)=><div key={String(r.id??i)} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{String(r.sale_number??r.id??'Venta')} · {String(r.sale_date??'')}</span><strong>{String(r.total??'—')} {String(r.currency??'')}</strong></div>):<p className="text-sm text-slate-500">Sin ventas en el período.</p>}</div></div><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Compras del período</h2><p className="mt-1 text-xs text-slate-500">Listado real desde Supabase; importes separados por moneda.</p><div className="mt-3 space-y-2">{reportPurchases.length?reportPurchases.map((r,i)=><div key={String(r.id??i)} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{String(r.document_number??r.id??'Compra')} · {String(r.document_date??'')}</span><strong>{String(r.total??'—')} {String(r.currency??'')}</strong></div>):<p className="text-sm text-slate-500">Sin compras en el período.</p>}</div></div></div></div>}
-    {message && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{message}</p>}
-    {!(section === 'Inventario' && ['movements', 'categories', 'minimum'].includes(inventoryView)) && <div className="mt-5 overflow-x-auto">{busy ? <p className="p-8 text-center text-sm text-slate-500">Consultando…</p> : visibleRows.length === 0 ? <div className="p-10 text-center"><p className="font-semibold">No hay registros para mostrar</p><p className="mt-1 text-sm text-slate-500">Puede que aún no existan datos, que falte aplicar la migración correspondiente o que tu usuario no tenga acceso al negocio.</p></div> : <table className="w-full min-w-[640px] border-collapse text-left text-sm"><thead><tr>{columns.map((c) => <th key={c} className="border-b border-slate-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{({name:'Producto',category_id:'Categoría',presentation:'Presentación',color:'Color',sale_price:'Precio',quantity:'Existencia',minimum_stock:'Stock mínimo',stock_status:'Estado',actions:'Acciones'} as Record<string,string>)[c] ?? c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{visibleRows.map((r,i) => <tr key={String(r.id ?? i)} onClick={section === 'Compras' ? () => void openPurchase(String(r.id)) : undefined} className={`odd:bg-slate-50 ${section === 'Compras' ? 'cursor-pointer hover:bg-orange-50' : ''}`}>{columns.map((c) => <td key={c} className="max-w-xs border-b border-slate-100 px-3 py-3 text-slate-700">{c === 'actions' && section === 'Inventario' ? <div className="flex min-w-36 flex-wrap gap-2"><button type="button" onClick={(e) => { e.stopPropagation(); beginEditProduct(r) }} className="font-semibold text-blue-700 underline">Editar</button><button type="button" onClick={(e) => { e.stopPropagation(); void toggleProductActive(r) }} disabled={busy} className="font-semibold text-red-700 underline">{r.active === false ? "Reactivar" : "Desactivar"}</button></div> : c === 'category_id' ? String(categories.find((cat) => String(cat.id) === String(r[c]))?.name ?? 'Sin categoría') : c === 'stock_status' ? Number(r.quantity ?? 0) <= 0 ? <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700">Agotado</span> : Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) < Number(r.minimum_stock ?? 0) ? <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-800">Reponer</span> : Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) === Number(r.minimum_stock ?? 0) ? <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">Stock bajo</span> : <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">Disponible</span> : pretty(r[c])}</td>)}</tr>)}</tbody></table>}</div>}
+    {section === 'Cuentas' && <div className="mt-5 rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Registrar pago a proveedor</h2><div className="mt-3 grid gap-3 md:grid-cols-4"><label className="text-sm md:col-span-2">Cuenta pendiente<select value={selectedPayable} onChange={e=>{setSelectedPayable(e.target.value);setSupplierPayAmount('')}} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar cuenta…</option>{payableRows.filter(x=>String(x.status)!=='paid').map(x=><option key={String(x.id)} value={String(x.id)}>{String(x.supplier_id)} · {String(x.balance ?? x.original_amount)} {String(x.currency)} · {String(x.status)}</option>)}</select></label><label className="text-sm">Importe<input value={supplierPayAmount} onChange={e=>setSupplierPayAmount(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Método<select value={supplierPayMethod} onChange={e=>setSupplierPayMethod(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{supplierPaymentMethods.map(m=><option key={String(m.id)} value={String(m.name)}>{String(m.name)}</option>)}</select></label><label className="text-sm md:col-span-3">Referencia<input value={supplierPayReference} onChange={e=>setSupplierPayReference(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={registerSupplierPayment} disabled={busy || !selectedPayable} className="self-end rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white">Registrar pago</button></div><p className="mt-3 text-xs text-slate-500">El pago respeta moneda, saldo y método autorizado. En cuentas USD, la base exige tasa BCV para la fecha del pago. El movimiento de caja queda en cola para el consumidor de Chat 4.</p></div>}
+    {section === 'Resumen del negocio' && <div className="mt-5 space-y-5">
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 p-4"><label className="text-sm">Desde<input type="date" value={reportFrom} onChange={e=>setReportFrom(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Hasta<input type="date" value={reportTo} onChange={e=>setReportTo(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={()=>void load()} disabled={busy||reportFrom>reportTo} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white">Actualizar resumen</button></div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[{label:'Ventas confirmadas',usd:sumCurrency(reportSales,'total','USD'),ves:sumCurrency(reportSales,'total','VES')},{label:'Compras registradas',usd:sumCurrency(reportPurchases,'total','USD'),ves:sumCurrency(reportPurchases,'total','VES')},{label:'Por cobrar',usd:sumCurrency(reportReceivables,'balance','USD'),ves:sumCurrency(reportReceivables,'balance','VES')},{label:'Por pagar',usd:sumCurrency(reportPayables,'balance','USD'),ves:sumCurrency(reportPayables,'balance','VES')}].map(x=><div key={x.label} className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-sm text-slate-500">{x.label}</p><p className="mt-2 text-lg font-bold">USD {x.usd.toFixed(2)}</p><p className="mt-1 text-sm text-slate-500">VES {x.ves.toFixed(2)}</p></div>)}</div>
+      <div className="grid gap-4 lg:grid-cols-2"><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Productos más vendidos</h2><p className="mt-1 text-xs text-slate-500">Unidades confirmadas en el período.</p>{topSellingProducts.length ? <div className="mt-3 space-y-3">{topSellingProducts.map((p,i)=><div key={p.name} className="flex justify-between border-b border-slate-100 pb-2 text-sm"><span>{i+1}. {p.name}</span><strong>{p.quantity.toLocaleString('es-VE')} uds.</strong></div>)}</div> : <p className="mt-3 text-sm text-slate-500">Sin ventas confirmadas en este período.</p>}</div><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Balance comercial</h2><p className="mt-1 text-xs text-slate-500">Ventas menos compras; no es utilidad neta ni incluye gastos operativos.</p><div className="mt-4 space-y-3"><div className="flex justify-between text-sm"><span>USD</span><strong>{(sumCurrency(reportSales,'total','USD')-sumCurrency(reportPurchases,'total','USD')).toFixed(2)}</strong></div><div className="flex justify-between text-sm"><span>VES</span><strong>{(sumCurrency(reportSales,'total','VES')-sumCurrency(reportPurchases,'total','VES')).toFixed(2)}</strong></div><p className="border-t border-slate-100 pt-3 text-xs text-slate-500">Eventos pendientes de caja: {reportCashPending}</p></div></div></div>
+    </div>}    {message && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{message}</p>}
+    {!(section === 'Inventario' && ['movements', 'categories', 'minimum'].includes(inventoryView)) && <div className="mt-5 overflow-x-auto">{busy ? <p className="p-8 text-center text-sm text-slate-500">Consultando…</p> : visibleRows.length === 0 ? <div className="p-10 text-center"><p className="font-semibold">No hay registros para mostrar</p><p className="mt-1 text-sm text-slate-500">Puede que aún no existan datos, que falte aplicar la migración correspondiente o que tu usuario no tenga acceso al negocio.</p></div> : <table className="w-full min-w-[640px] border-collapse text-left text-sm"><thead><tr>{columns.map((c) => <th key={c} className="border-b border-slate-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{({name:'Producto',category_id:'Categoría',presentation:'Presentación',color:'Color',sale_price:'Precio USD',quantity:'Existencia',minimum_stock:'Stock mínimo',stock_status:'Estado',inventory_value:'Valor USD',customer_id:'Cliente',supplier_id:'Proveedor',original_amount:'Monto original',paidAmount:'Abonado',balance:'Saldo',due_date:'Vencimiento',actions:'Acciones'} as Record<string,string>)[c] ?? c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{visibleRows.map((r,i) => <tr key={String(r.id ?? i)} onClick={section === 'Compras' ? () => void openPurchase(String(r.id)) : undefined} className={`odd:bg-slate-50 ${section === 'Compras' ? 'cursor-pointer hover:bg-orange-50' : ''}`}>{columns.map((c) => <td key={c} className="max-w-xs border-b border-slate-100 px-3 py-3 text-slate-700">{c === 'actions' && section === 'Inventario' ? <div className="flex min-w-36 flex-wrap gap-2"><button type="button" onClick={(e) => { e.stopPropagation(); beginEditProduct(r) }} className="font-semibold text-blue-700 underline">Editar</button><button type="button" onClick={(e) => { e.stopPropagation(); void toggleProductActive(r) }} disabled={busy} className="font-semibold text-red-700 underline">{r.active === false ? "Reactivar" : "Desactivar"}</button></div> : c === 'actions' && section === 'Cotizaciones' ? <button type="button" disabled={busy || !['pending','draft'].includes(String(r.status))} onClick={(e) => { e.stopPropagation(); void confirmQuote(r) }} className="rounded-lg bg-[#172b4d] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40">Confirmar operación</button> : c === 'customer_id' ? String(customerRows.find(cu => String(cu.id) === String(r[c]))?.name ?? r[c]) : c === 'supplier_id' ? String(purchaseSuppliers.find(su => String(su.id) === String(r[c]))?.name ?? r[c]) : c === 'inventory_value' ? 'USD ' + (Number(r.value_ves ?? 0) / (bcvRate || 1)).toFixed(2) : c === 'category_id' ? String(categories.find((cat) => String(cat.id) === String(r[c]))?.name ?? 'Sin categoría') : c === 'stock_status' ? Number(r.quantity ?? 0) <= 0 ? <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700">Agotado</span> : Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) < Number(r.minimum_stock ?? 0) ? <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-800">Reponer</span> : Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) === Number(r.minimum_stock ?? 0) ? <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">Stock bajo</span> : <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">Disponible</span> : pretty(r[c])}</td>)}</tr>)}</tbody></table>}</div>}
     </section><p className="mt-4 text-xs text-slate-500">Reportes consultan ventas, compras y saldos directamente desde Supabase. Ventas y cotizaciones cuentan con formularios conectados a los RPC comerciales; la confirmación de venta descuenta inventario de forma transaccional. Caja y cierres cuentan con su módulo transaccional; la factura fiscal requiere emisor autorizado y validación legal.</p><div className="mt-4 flex flex-wrap gap-4"><a href="/caja" className="inline-block text-sm font-semibold text-orange-700 underline">Abrir caja y cierres</a><a href="/administracion" className="inline-block text-sm font-semibold text-orange-700 underline">Administración y auditoría</a></div></div></div></div></main>
 }
