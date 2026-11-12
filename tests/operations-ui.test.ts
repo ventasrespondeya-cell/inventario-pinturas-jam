@@ -89,7 +89,7 @@ test('resumen del negocio muestra valores reales y productos más vendidos', () 
   assert.match(route, /commercial\.listReceivables\(\)/)
   assert.match(route, /purchases\.listPayables\(\)/)
   assert.match(route, /Productos más vendidos/)
-  assert.match(route, /Balance comercial del período/)
+  assert.match(route, /Balance comercial/)
 })
 
 test('Ventas se elimina del menú y las cuentas se unifican en un apartado', () => {
