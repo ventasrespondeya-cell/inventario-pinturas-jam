@@ -296,7 +296,7 @@ export default function OperationsPage() {
     setSupplierName(''); setSupplierTaxId(''); setSupplierPhone('')
     setMessage('Proveedor guardado correctamente.')
     const refreshed = await purchases.listSuppliers()
-    if (refreshed.ok) { setPurchaseSuppliers(refreshed.data as Row[]); await load() }
+    if (refreshed.ok) { setPurchaseSuppliers(refreshed.data as unknown as Row[]); await load() }
   }
 
   function addPurchaseLine(e: FormEvent) {
@@ -361,7 +361,7 @@ export default function OperationsPage() {
     if (!result.ok) { setMessage(result.error.message); return }
     setSupplierPayAmount(''); setSupplierPayReference(''); setMessage('Pago al proveedor registrado. Se generó el evento para su integración con caja.');
     const refreshed = await purchases.listPayables()
-    if (refreshed.ok) setPayableRows(refreshed.data as Row[])
+    if (refreshed.ok) setPayableRows(refreshed.data as unknown as Row[])
     await load()
   }
 
