@@ -17,9 +17,27 @@ test('la consola consulta servicios reales de catálogo, inventario y área come
   assert.match(route, /purchases\.listPurchases/)
 })
 
-test('el alta de cliente pasa por el servicio validado y no por escrituras directas', () => {
-  assert.match(route, /commercial\.saveCustomer/)
-  assert.doesNotMatch(route, /\.from\(['"]jam_customers['"]\)\.insert/)
+test('clientes y proveedores no aparecen como módulos independientes', () => {
+  assert.doesNotMatch(route, /type Section = [^\n]*'Clientes'/)
+  assert.doesNotMatch(route, /type Section = [^\n]*'Proveedores'/)
+  assert.doesNotMatch(route, /section === 'Clientes'|section === 'Proveedores'/)
+  assert.doesNotMatch(route, /createCustomer|createSupplier/)
+})
+
+test('inventario permite editar y archivar productos y categorías sin borrar historial', () => {
+  assert.match(route, /catalog\.saveProduct/)
+  assert.match(route, /editingProduct/)
+  assert.match(route, /catalog\.setProductActive/)
+  assert.match(route, /catalog\.saveCategory/)
+  assert.match(route, /catalog\.setCategoryActive/)
+})
+
+test('inventario registra movimientos y expone mínimos y alertas', () => {
+  assert.match(route, /inventory\.recordMovement/)
+  assert.match(route, /inventory\.movements/)
+  assert.match(route, /inventory\.setMinimumStock/)
+  assert.match(route, /Alertas de stock/)
+  assert.match(route, /Stock mínimo/)
 })
 
 test('la consola no expone secretos de Supabase', () => {
@@ -34,13 +52,10 @@ test('el panel principal dirige acciones rápidas a las secciones operativas rea
   assert.match(dashboard, /href="\/operaciones\?section=Cotizaciones"/)
 })
 
-test('las opciones de operación rápida navegan al módulo en vez de cerrar sin acción', () => {
+test('el panel inicial dirige al espacio de operaciones', () => {
   const dashboard = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
-  const modal = dashboard.slice(dashboard.indexOf('function QuickModal('), dashboard.indexOf('function MiniChart('))
-  assert.match(modal, /href: '\/operaciones\?section=Ventas'/)
-  assert.match(modal, /href: '\/operaciones\?section=Compras'/)
-  assert.match(modal, /href: '\/operaciones\?section=Clientes'/)
-  assert.match(modal, /onClick={onClose}/)
+  assert.match(dashboard, /href="\/operaciones"/)
+  assert.doesNotMatch(dashboard, /Clientes|Proveedores/)
 })
 
 test('la consola abre la sección indicada por el enlace del dashboard', () => {
