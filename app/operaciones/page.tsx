@@ -12,9 +12,9 @@ import type { CommercialLineInput, Currency } from '@/lib/modules/commercial/typ
 import { PurchasesService } from '@/lib/modules/purchases'
 import type { User } from '@supabase/supabase-js'
 
-type Section = 'Inventario' | 'Clientes' | 'Proveedores' | 'Compras' | 'Ventas' | 'Cotizaciones' | 'Cuentas por cobrar' | 'Cuentas por pagar' | 'Reportes'
+type Section = 'Inventario' | 'Compras' | 'Ventas' | 'Cotizaciones' | 'Cuentas por cobrar' | 'Cuentas por pagar' | 'Reportes'
 type Row = Record<string, unknown>
-const sections: Section[] = ['Inventario', 'Clientes', 'Proveedores', 'Compras', 'Ventas', 'Cotizaciones', 'Cuentas por cobrar', 'Cuentas por pagar', 'Reportes']
+const sections: Section[] = ['Inventario', 'Compras', 'Ventas', 'Cotizaciones', 'Cuentas por cobrar', 'Cuentas por pagar', 'Reportes']
 const errorText = (e: unknown) => e instanceof Error ? e.message : 'Ocurrió un error inesperado.'
 const pretty = (v: unknown) => v == null || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v)
 
@@ -29,15 +29,11 @@ export default function OperationsPage() {
   const [search, setSearch] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [customerName, setCustomerName] = useState('')
-  const [customerDocument, setCustomerDocument] = useState('')
-  const [customerPhone, setCustomerPhone] = useState('')
   const [categories, setCategories] = useState<Row[]>([])
   const [selectedCategory, setSelectedCategory] = useState('')
   const [categoryName, setCategoryName] = useState('')
   const [productName, setProductName] = useState('')
   const [productSku, setProductSku] = useState('')
-  const [productBrand, setProductBrand] = useState('')
   const [productCategory, setProductCategory] = useState('')
   const [productPresentation, setProductPresentation] = useState('')
   const [productUnit, setProductUnit] = useState('unidad')
@@ -57,9 +53,6 @@ export default function OperationsPage() {
   const [cartPrice, setCartPrice] = useState('')
   const [cart, setCart] = useState<CommercialLineInput[]>([])
   const [customerRows, setCustomerRows] = useState<Row[]>([])
-  const [supplierName, setSupplierName] = useState('')
-  const [supplierTaxId, setSupplierTaxId] = useState('')
-  const [supplierPhone, setSupplierPhone] = useState('')
   const [purchaseSuppliers, setPurchaseSuppliers] = useState<Row[]>([])
   const [purchaseProducts, setPurchaseProducts] = useState<Row[]>([])
   const [purchaseWarehouses, setPurchaseWarehouses] = useState<Row[]>([])
@@ -126,7 +119,7 @@ export default function OperationsPage() {
   }, [user, catalog])
 
   useEffect(() => {
-    if (!user || (section !== 'Compras' && section !== 'Proveedores' && section !== 'Cuentas por pagar')) return
+    if (!user || (section !== 'Compras' && section !== 'Cuentas por pagar')) return
     let mounted = true
     Promise.all([purchases.listSuppliers(), catalog.listProducts(), inventory.warehouses(), purchases.listPayables(), commercial.listPaymentMethods()]).then(([suppliers, products, stockrooms, payables, methods]) => {
       if (!mounted) return
@@ -175,8 +168,6 @@ export default function OperationsPage() {
         setRows((products.data as Row[]).map((p) => ({ ...p, ...(stockByProduct.get(String(p.id)) ?? {}) })))
       } else {
         switch (section) {
-          case 'Clientes': result = await commercial.listCustomers(search); break
-          case 'Proveedores': result = await purchases.listSuppliers(search); break
           case 'Compras': result = await purchases.listPurchases({}); break
           case 'Ventas': result = await commercial.listSales(); break
           case 'Cotizaciones': result = await commercial.listQuotes(); break
@@ -203,18 +194,6 @@ export default function OperationsPage() {
 
   async function signOut() { await db.auth.signOut(); setRows([]); setMessage('Sesión cerrada.') }
 
-  async function createCustomer(e: FormEvent) {
-    e.preventDefault()
-    const name = customerName.trim()
-    if (!name) { setMessage('El nombre del cliente es obligatorio.'); return }
-    setBusy(true); setMessage('')
-    const result = await commercial.saveCustomer({ name, identificationNumber: customerDocument.trim() || null, phone: customerPhone.trim() || null })
-    setBusy(false)
-    if (!result.ok) { setMessage(result.error.message); return }
-    setCustomerName(''); setCustomerDocument(''); setCustomerPhone('')
-    setMessage('Cliente guardado correctamente.'); await load()
-  }
-
   async function createCategory(e: FormEvent) {
     e.preventDefault()
     if (!user) return
@@ -233,8 +212,8 @@ export default function OperationsPage() {
     if (!user) return
     const input: ProductInput = {
       name: productName.trim(),
-      sku: productSku.trim() || null,
-      brand: productBrand.trim() || null,
+      sku: null,
+      brand: null,
       categoryId: productCategory || null,
       presentation: productPresentation.trim() || null,
       unit: productUnit,
@@ -245,7 +224,7 @@ export default function OperationsPage() {
     const result = await catalog.saveProduct(input, { userId: user.id })
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
-    setProductName(''); setProductSku(''); setProductBrand(''); setProductPresentation('')
+    setProductName(''); setProductPresentation('')
     setProductColor(''); setProductPrice('')
     setMessage('Producto guardado correctamente.')
     await load()
@@ -285,19 +264,6 @@ export default function OperationsPage() {
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
     setCart([]); setSaleNotes(''); setSalePaymentAmount(''); setMessage('Venta confirmada. Se registró el movimiento de inventario y los cobros informados.'); await load()
-  }
-
-  async function createSupplier(e: FormEvent) {
-    e.preventDefault()
-    if (!supplierName.trim()) { setMessage('El nombre del proveedor es obligatorio.'); return }
-    setBusy(true); setMessage('')
-    const result = await purchases.saveSupplier({ name: supplierName.trim(), taxId: supplierTaxId.trim() || null, phone: supplierPhone.trim() || null, active: true })
-    setBusy(false)
-    if (!result.ok) { setMessage(result.error.message); return }
-    setSupplierName(''); setSupplierTaxId(''); setSupplierPhone('')
-    setMessage('Proveedor guardado correctamente.')
-    const refreshed = await purchases.listSuppliers()
-    if (refreshed.ok) { setPurchaseSuppliers(refreshed.data as unknown as Row[]); await load() }
   }
 
   function addPurchaseLine(e: FormEvent) {
@@ -369,8 +335,6 @@ export default function OperationsPage() {
   const columns = useMemo(() => {
     const preferred: Record<Section, string[]> = {
       Inventario: ['sku','name','presentation','unit','quantity','average_cost_ves','minimum_stock','sale_price','active'],
-      Clientes: ['name','identification_type','identification_number','tax_id','phone','email','credit_enabled','active'],
-      Proveedores: ['name','tax_id','phone','email','active'],
       Compras: ['document_number','document_date','currency','status','total','created_at'],
       Ventas: ['sale_number','sale_date','currency','status','total','created_at'],
       Cotizaciones: ['quote_number','quote_date','currency','status','total','valid_until'],
@@ -487,8 +451,6 @@ export default function OperationsPage() {
       </form>
       <form onSubmit={createProduct} className="mt-3 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-4">
         <label className="text-sm">Nombre del producto *<input required value={productName} onChange={(e) => setProductName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
-        <label className="text-sm">Código / SKU<input value={productSku} onChange={(e) => setProductSku(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
-        <label className="text-sm">Marca<input value={productBrand} onChange={(e) => setProductBrand(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <label className="text-sm">Categoría<select value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Sin categoría</option>{categories.map((c) => <option key={String(c.id)} value={String(c.id)}>{String(c.name)}</option>)}</select></label>
         <label className="text-sm">Presentación<input value={productPresentation} onChange={(e) => setProductPresentation(e.target.value)} placeholder="Galón, cuñete…" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <label className="text-sm">Unidad<select value={productUnit} onChange={(e) => setProductUnit(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="unidad">Unidad</option><option value="galón">Galón</option><option value="cuñete">Cuñete</option><option value="litro">Litro</option><option value="kilogramo">Kilogramo</option></select></label>
@@ -516,7 +478,6 @@ export default function OperationsPage() {
       <div className="flex flex-wrap gap-2">{section === 'Cotizaciones' ? <button onClick={saveQuote} disabled={busy || !cart.length} className="rounded-lg bg-orange-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50">Guardar cotización</button> : <button onClick={confirmSale} disabled={busy || !cart.length} className="rounded-lg bg-orange-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50">Confirmar venta y descontar inventario</button>}<button type="button" onClick={()=>setCart([])} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-semibold">Vaciar operación</button></div>
       <p className="text-xs text-slate-500">Los documentos se guardan en Supabase. La venta confirmada valida existencias y registra la salida de inventario en una transacción. Los descuentos y la emisión fiscal requieren sus permisos y configuración correspondientes.</p>
     </div>}
-    {section === 'Proveedores' && <form onSubmit={createSupplier} className="mt-5 grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4"><label className="text-sm">Razón social / nombre *<input required value={supplierName} onChange={e=>setSupplierName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">RIF / identificación<input value={supplierTaxId} onChange={e=>setSupplierTaxId(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Teléfono<input value={supplierPhone} onChange={e=>setSupplierPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><button disabled={busy} className="self-end rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white">Guardar proveedor</button></form>}
     {section === 'Compras' && <div className="mt-5 space-y-4">
       <div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Registrar compra / orden de mercancía</h2><div className="mt-3 grid gap-3 md:grid-cols-4"><label className="text-sm">Proveedor<select value={purchaseSupplier} onChange={e=>setPurchaseSupplier(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{purchaseSuppliers.map(x=><option key={String(x.id)} value={String(x.id)}>{String(x.name)}</option>)}</select></label><label className="text-sm">N.º documento<input value={purchaseDocument} onChange={e=>setPurchaseDocument(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Fecha<input type="date" value={purchaseDate} onChange={e=>setPurchaseDate(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Moneda<select value={purchaseCurrency} onChange={e=>setPurchaseCurrency(e.target.value as Currency)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="VES">VES</option><option value="USD">USD</option></select></label></div>
       <form onSubmit={addPurchaseLine} className="mt-4 grid gap-3 rounded-lg bg-slate-50 p-3 md:grid-cols-6"><label className="text-sm md:col-span-2">Producto<select required value={purchaseProduct} onChange={e=>setPurchaseProduct(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{purchaseProducts.map(x=><option key={String(x.id)} value={String(x.id)}>{String(x.name)} · {String(x.sku ?? 'Sin código')}</option>)}</select></label><label className="text-sm">Cantidad<input value={purchaseQuantity} onChange={e=>setPurchaseQuantity(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Costo unitario<input value={purchaseUnitCost} onChange={e=>setPurchaseUnitCost(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Descuento total<input value={purchaseDiscount} onChange={e=>setPurchaseDiscount(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Gastos atribuibles<input value={purchaseExpense} onChange={e=>setPurchaseExpense(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><button className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold md:col-span-6">Agregar línea</button></form>
@@ -527,7 +488,6 @@ export default function OperationsPage() {
     </div>}
     {section === 'Cuentas por pagar' && <div className="mt-5 rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Registrar pago a proveedor</h2><div className="mt-3 grid gap-3 md:grid-cols-4"><label className="text-sm md:col-span-2">Cuenta pendiente<select value={selectedPayable} onChange={e=>{setSelectedPayable(e.target.value);setSupplierPayAmount('')}} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar cuenta…</option>{payableRows.filter(x=>String(x.status)!=='paid').map(x=><option key={String(x.id)} value={String(x.id)}>{String(x.supplier_id)} · {String(x.balance ?? x.original_amount)} {String(x.currency)} · {String(x.status)}</option>)}</select></label><label className="text-sm">Importe<input value={supplierPayAmount} onChange={e=>setSupplierPayAmount(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Método<select value={supplierPayMethod} onChange={e=>setSupplierPayMethod(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{supplierPaymentMethods.map(m=><option key={String(m.id)} value={String(m.name)}>{String(m.name)}</option>)}</select></label><label className="text-sm md:col-span-3">Referencia<input value={supplierPayReference} onChange={e=>setSupplierPayReference(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={registerSupplierPayment} disabled={busy || !selectedPayable} className="self-end rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white">Registrar pago</button></div><p className="mt-3 text-xs text-slate-500">El pago respeta moneda, saldo y método autorizado. En cuentas USD, la base exige tasa BCV para la fecha del pago. El movimiento de caja queda en cola para el consumidor de Chat 4.</p></div>}
     {section === 'Reportes' && <div className="mt-5 space-y-5"><div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 p-4"><label className="text-sm">Desde<input type="date" value={reportFrom} onChange={e=>setReportFrom(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Hasta<input type="date" value={reportTo} onChange={e=>setReportTo(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={()=>void load()} disabled={busy || reportFrom>reportTo} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Generar reporte</button></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[{label:'Ventas registradas',value:String(reportSales.length)},{label:'Compras registradas',value:String(reportPurchases.length)},{label:'Cuentas por cobrar',value:String(reportReceivables.length)},{label:'Cuentas por pagar',value:String(reportPayables.length)}].map(x=><div key={x.label} className="rounded-xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">{x.label}</p><p className="mt-2 text-3xl font-bold">{x.value}</p></div>)}</div><div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Eventos comerciales pendientes de sincronizar: {reportCashPending}.</strong><p className="mt-1">Son cobros y pagos aún no importados a un turno de caja de la misma moneda. Abre caja y ejecuta la sincronización para incorporarlos al arqueo.</p></div><div className="grid gap-4 lg:grid-cols-2"><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Ventas del período</h2><p className="mt-1 text-xs text-slate-500">Listado real desde Supabase; importes separados por moneda.</p><div className="mt-3 space-y-2">{reportSales.length?reportSales.map((r,i)=><div key={String(r.id??i)} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{String(r.sale_number??r.id??'Venta')} · {String(r.sale_date??'')}</span><strong>{String(r.total??'—')} {String(r.currency??'')}</strong></div>):<p className="text-sm text-slate-500">Sin ventas en el período.</p>}</div></div><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Compras del período</h2><p className="mt-1 text-xs text-slate-500">Listado real desde Supabase; importes separados por moneda.</p><div className="mt-3 space-y-2">{reportPurchases.length?reportPurchases.map((r,i)=><div key={String(r.id??i)} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{String(r.document_number??r.id??'Compra')} · {String(r.document_date??'')}</span><strong>{String(r.total??'—')} {String(r.currency??'')}</strong></div>):<p className="text-sm text-slate-500">Sin compras en el período.</p>}</div></div></div></div>}
-    {section === 'Clientes' && <form onSubmit={createCustomer} className="mt-5 grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4"><label className="text-sm">Nombre *<input required value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Documento<input value={customerDocument} onChange={(e) => setCustomerDocument(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Teléfono<input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><button disabled={busy} className="self-end rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Guardar cliente</button></form>}
     {message && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{message}</p>}
     <div className="mt-5 overflow-x-auto">{busy ? <p className="p-8 text-center text-sm text-slate-500">Consultando…</p> : visibleRows.length === 0 ? <div className="p-10 text-center"><p className="font-semibold">No hay registros para mostrar</p><p className="mt-1 text-sm text-slate-500">Puede que aún no existan datos, que falte aplicar la migración correspondiente o que tu usuario no tenga acceso al negocio.</p></div> : <table className="w-full min-w-[640px] border-collapse text-left text-sm"><thead><tr>{columns.map((c) => <th key={c} className="border-b border-slate-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{visibleRows.map((r,i) => <tr key={String(r.id ?? i)} onClick={section === 'Compras' ? () => void openPurchase(String(r.id)) : undefined} className={`odd:bg-slate-50 ${section === 'Compras' ? 'cursor-pointer hover:bg-orange-50' : ''}`}>{columns.map((c) => <td key={c} className="max-w-xs border-b border-slate-100 px-3 py-3 text-slate-700">{c === 'category_id' ? String(categories.find((cat) => String(cat.id) === String(r[c]))?.name ?? 'Sin categoría') : pretty(r[c])}</td>)}</tr>)}</tbody></table>}</div>
     </section><p className="mt-4 text-xs text-slate-500">Reportes consultan ventas, compras y saldos directamente desde Supabase. Ventas y cotizaciones cuentan con formularios conectados a los RPC comerciales; la confirmación de venta descuenta inventario de forma transaccional. Caja y cierres cuentan con su módulo transaccional; la factura fiscal requiere emisor autorizado y validación legal.</p><div className="mt-4 flex flex-wrap gap-4"><a href="/caja" className="inline-block text-sm font-semibold text-orange-700 underline">Abrir caja y cierres</a><a href="/administracion" className="inline-block text-sm font-semibold text-orange-700 underline">Administración y auditoría</a><a href="/" className="inline-block text-sm text-orange-700 underline">Volver al panel visual</a></div></div></main>
