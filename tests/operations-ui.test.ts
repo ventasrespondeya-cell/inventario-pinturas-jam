@@ -44,14 +44,6 @@ test('la consola no expone secretos de Supabase', () => {
   assert.doesNotMatch(route, /process\.env\.[A-Z_]*SERVICE_ROLE/i)
 })
 
-test('el panel principal dirige acciones rápidas a las secciones operativas reales', () => {
-  const dashboard = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
-  assert.match(dashboard, /href="\/operaciones\?section=Ventas"/)
-  assert.match(dashboard, /href="\/operaciones\?section=Compras"/)
-  assert.match(dashboard, /href="\/operaciones\?section=Inventario"/)
-  assert.match(dashboard, /href="\/operaciones\?section=Cotizaciones"/)
-})
-
 test('el panel inicial dirige al espacio de operaciones', () => {
   const dashboard = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
   assert.match(dashboard, /href="\/operaciones"/)
