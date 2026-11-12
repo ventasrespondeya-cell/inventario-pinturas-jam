@@ -16,7 +16,7 @@ test('cash client uses RPCs and never accesses service-role credentials', () => 
   assert.match(source, /jam_cash_session_close/)
   assert.doesNotMatch(source, /service_role/i)
 })
-test('cash screen provides open, income/expense, event sync and counted close actions', () => {
+test('daily cash closing screen provides draft save and final close actions', () => {
   const source = readFileSync(join(root, 'app/caja/page.tsx'), 'utf8')
-  for (const label of ['Abrir turno de caja','Guardar movimiento','Sincronizar eventos comerciales','Cerrar caja y registrar arqueo']) assert.ok(source.includes(label))
+  for (const label of ['Cierre diario de caja','Guardar borrador','Finalizar cierre del día']) assert.ok(source.includes(label))
 })
