@@ -112,7 +112,7 @@ test('cotizaciones sólo muestran métodos de pago y se confirman como operació
 test('compras mantiene un formulario simple sin descuentos ni gastos atribuibles', () => {
   assert.doesNotMatch(route, /Descuento total<input|Gastos atribuibles<input/)
   assert.match(route, /currency: 'USD'/)
-  assert.match(route, /COMP-\$\{Date\.now\(\)\}/)
+  assert.match(route, /COMP-' \+ Date\.now\(\)/)
 })
 
 test('inventario calcula el valor de mercancía en dólares', () => {
