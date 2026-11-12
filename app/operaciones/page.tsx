@@ -388,7 +388,91 @@ export default function OperationsPage() {
 
   if (!ready) return <main className="min-h-screen bg-slate-50 p-8 text-slate-700">Cargando sesión segura…</main>
 
-  if (!user) return <main className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900"><div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"><p className="text-xs font-semibold tracking-[.2em] text-orange-600">PINTURAS JAM</p><h1 className="mt-2 text-2xl font-bold">Acceso al sistema</h1><p className="mt-2 text-sm text-slate-600">Inicia sesión con un usuario ya creado y autorizado en Supabase. No se crean usuarios ni permisos desde esta pantalla.</p><form onSubmit={signIn} className="mt-6 space-y-4"><label className="block text-sm font-medium">Correo<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></label><label className="block text-sm font-medium">Contraseña<input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label><button disabled={busy} className="w-full rounded-lg bg-orange-600 px-4 py-2.5 font-semibold text-white disabled:opacity-50">{busy ? 'Ingresando…' : 'Iniciar sesión'}</button></form>{message && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{message}</p>}<p className="mt-6 text-xs text-slate-500">Configura NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY en .env.local. Nunca uses service_role en el navegador.</p><a className="mt-4 inline-block text-sm text-orange-700 underline" href="/">Volver al panel visual</a></div></main>
+  if (!user) return (
+    <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#f3f5fa] px-4 py-10 text-slate-900 sm:px-6">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -left-40 -top-40 h-[34rem] w-[34rem] rounded-full bg-blue-200/50 blur-3xl" />
+        <div className="absolute -bottom-48 -right-40 h-[38rem] w-[38rem] rounded-full bg-orange-200/50 blur-3xl" />
+        <div className="absolute inset-0 opacity-[0.22]" style={{ backgroundImage: 'radial-gradient(#64748b 0.7px, transparent 0.7px)', backgroundSize: '22px 22px' }} />
+      </div>
+
+      <div className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_30px_100px_-35px_rgba(15,35,80,0.38)] lg:min-h-[610px] lg:grid-cols-[1.02fr_0.98fr]">
+        <section className="relative flex flex-col items-center justify-center overflow-hidden bg-[#142b59] px-7 py-10 text-center text-white sm:px-12 lg:px-14">
+          <div aria-hidden="true" className="absolute -right-24 -top-24 h-72 w-72 rounded-full border border-white/10" />
+          <div aria-hidden="true" className="absolute -bottom-32 -left-24 h-96 w-96 rounded-full border border-white/10" />
+          <div aria-hidden="true" className="absolute right-0 top-0 h-2 w-full bg-gradient-to-r from-orange-400 via-pink-500 to-cyan-400" />
+          <div className="relative z-10 flex w-full max-w-sm flex-col items-center">
+            <div className="mb-7 rounded-full bg-white p-2 shadow-2xl ring-1 ring-white/30">
+              <Image src="/pinturas-jam-logo.jpg" alt="Logo oficial de Pinturas JAM" width={220} height={220} priority className="h-40 w-40 rounded-full object-contain sm:h-48 sm:w-48" />
+            </div>
+            <p className="text-xs font-bold uppercase tracking-[0.32em] text-blue-200">Excelencia en pinturas</p>
+            <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">PINTURAS JAM</h1>
+            <p className="mt-4 max-w-xs text-sm leading-7 text-blue-100/85">
+              Tu espacio de trabajo para administrar inventario, ventas y operaciones de forma segura.
+            </p>
+            <div className="mt-9 flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-blue-100 backdrop-blur">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
+              Plataforma de gestión comercial
+            </div>
+          </div>
+        </section>
+
+        <section className="flex items-center justify-center px-6 py-10 sm:px-12 lg:px-14">
+          <div className="w-full max-w-md">
+            <div className="mb-8">
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-600">Acceso autorizado</p>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-[#142b59] sm:text-4xl">Iniciar sesión</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Ingresa con tu correo y contraseña de usuario autorizado para continuar.
+              </p>
+            </div>
+
+            <form onSubmit={signIn} className="space-y-5">
+              <label className="block text-sm font-semibold text-slate-700">
+                Correo electrónico
+                <span className="relative mt-2 block">
+                  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400">
+                    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>
+                  </span>
+                  <input className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-700 focus:bg-white focus:ring-4 focus:ring-blue-100" type="email" autoComplete="username" placeholder="nombre@empresa.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                </span>
+              </label>
+
+              <label className="block text-sm font-semibold text-slate-700">
+                Contraseña
+                <span className="relative mt-2 block">
+                  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400">
+                    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /><path d="M12 14v3" /></svg>
+                  </span>
+                  <input className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-700 focus:bg-white focus:ring-4 focus:ring-blue-100" type="password" autoComplete="current-password" placeholder="Tu contraseña" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                </span>
+              </label>
+
+              <button disabled={busy} className="group flex w-full items-center justify-center gap-3 rounded-xl bg-[#142b59] px-5 py-4 text-sm font-bold tracking-wide text-white shadow-lg shadow-blue-950/15 transition hover:-translate-y-0.5 hover:bg-[#1d3b77] hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200 disabled:cursor-not-allowed disabled:opacity-60">
+                {busy ? 'Verificando acceso…' : 'ENTRAR AL SISTEMA'}
+                {!busy && <span aria-hidden="true" className="text-lg transition-transform group-hover:translate-x-1">→</span>}
+              </button>
+            </form>
+
+            {message && <p role="alert" className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm leading-6 text-red-700">{message}</p>}
+
+            <div className="mt-7 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <p className="text-xs leading-5 text-slate-500">
+                <span className="font-semibold text-slate-700">Acceso protegido.</span> Solo pueden ingresar usuarios previamente creados y autorizados en Supabase. Esta pantalla no crea cuentas ni permisos.
+              </p>
+            </div>
+
+            <a className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-[#244477] transition hover:text-orange-600" href="/">
+              <span aria-hidden="true">←</span> Volver al panel visual
+            </a>
+            <p className="mt-8 border-t border-slate-100 pt-5 text-[11px] leading-5 text-slate-400">
+              Configuración técnica: NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Nunca exponer service_role en el navegador.
+            </p>
+          </div>
+        </section>
+      </div>
+    </main>
+  )
 
   return <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 md:px-8"><div className="mx-auto max-w-7xl"><header className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-bold tracking-[.2em] text-orange-600">PINTURAS JAM · OPERACIONES</p><h1 className="mt-1 text-2xl font-bold">Centro de datos comerciales</h1><p className="mt-1 text-sm text-slate-600">Sesión: {user.email ?? user.id}</p></div><div className="flex gap-2"><button onClick={() => void load()} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">Actualizar</button><button onClick={() => void signOut()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Cerrar sesión</button></div></header>
     {notice && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{notice}</p>}\n    <div className="mt-6 flex flex-wrap gap-2">{sections.map((s) => <button key={s} onClick={() => { setSection(s); setSearch(''); setSelectedCategory('') }} className={`rounded-full px-4 py-2 text-sm font-semibold ${section === s ? 'bg-orange-600 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}>{s}</button>)}</div>
