@@ -83,12 +83,40 @@ test('cuentas por pagar registra pagos mediante el servicio y conserva la moneda
   assert.match(route, /currency: String\(payable\.currency\) as Currency/)
 })
 
-test('reportes consultan ventas, compras, cuentas y eventos pendientes desde servicios Supabase', async () => {
-  const source = route;
-  assert.match(source, /commercial\.listSales\(reportFrom, reportTo\)/);
-  assert.match(source, /purchases\.listPurchases\(\{ from: reportFrom, to: reportTo \}\)/);
-  assert.match(source, /commercial\.listReceivables\(\)/);
-  assert.match(source, /purchases\.listPayables\(\)/);
-  assert.match(source, /commercial\.listCashEventsPending\(500\)/);
-  assert.match(source, /Abre caja y ejecuta la sincronización/);
-});
+test('resumen del negocio muestra valores reales y productos más vendidos', () => {
+  assert.match(route, /commercial\.listSales\(reportFrom, reportTo\)/)
+  assert.match(route, /purchases\.listPurchases\(\{ from: reportFrom, to: reportTo \}\)/)
+  assert.match(route, /commercial\.listReceivables\(\)/)
+  assert.match(route, /purchases\.listPayables\(\)/)
+  assert.match(route, /Productos más vendidos/)
+  assert.match(route, /Balance comercial del período/)
+})
+
+test('Ventas se elimina del menú y las cuentas se unifican en un apartado', () => {
+  assert.doesNotMatch(route, /type Section = [^\\n]*'Ventas'/)
+  assert.match(route, /'Cuentas'/)
+  assert.match(route, /setAccountView\('receivable'\)/)
+  assert.match(route, /setAccountView\('payable'\)/)
+  assert.match(route, /commercial\.registerCustomerPayment/)
+})
+
+test('cotizaciones sólo muestran métodos de pago y se confirman como operación real', () => {
+  assert.match(route, /Métodos de pago disponibles/)
+  assert.match(route, /async function confirmQuote/)
+  assert.match(route, /quoteId: String\(quote\.id\)/)
+  assert.match(route, /payments: \[\]/)
+  assert.match(route, /Confirmar operación/)
+  assert.doesNotMatch(route, /Monto recibido/)
+})
+
+test('compras mantiene un formulario simple sin descuentos ni gastos atribuibles', () => {
+  assert.doesNotMatch(route, /Descuento total<input|Gastos atribuibles<input/)
+  assert.match(route, /currency: 'USD'/)
+  assert.match(route, /COMP-\$\{Date\.now\(\)\}/)
+})
+
+test('inventario calcula el valor de mercancía en dólares', () => {
+  assert.match(route, /valueUsd:/)
+  assert.match(route, /Valor de mercancía/)
+  assert.match(route, /Costo promedio en USD/)
+})
