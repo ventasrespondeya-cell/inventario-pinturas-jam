@@ -1,6 +1,6 @@
 # PINTURAS JAM — Sistema comercial
 
-Aplicación Next.js + Supabase para operaciones de una tienda de pinturas: catálogo, inventario, compras y recepción, ventas, cotizaciones, clientes, cuentas por cobrar/pagar, caja, cierres, reportes, accesos y auditoría.
+Aplicación Next.js + Supabase para operaciones de una tienda de pinturas: inventario, compras y recepción, ventas, cotizaciones, cuentas por cobrar/pagar, caja, cierres, reportes, accesos y auditoría. Los datos de clientes y proveedores se mantienen como referencias operativas dentro de ventas, compras y saldos, pero no existen como módulos independientes de gestión.
 
 ## Requisitos
 
@@ -40,6 +40,8 @@ Aplicar en orden, primero en una base de desarrollo/staging con respaldo:
 2. `20261109200000_chat3_commercial.sql`
 3. `20261109300000_chat4_cash_control.sql`
 4. `20261110400000_chat5_security_audit.sql`
+5. `202611120001_create_daily_cashbook_closings.sql`
+6. `20261112230500_inventory_catalog_soft_deactivation.sql`
 
 No aplicar a producción sin respaldar, revisar RLS y probar cada rol. No se crean productos, clientes, existencias, tasas ni saldos ficticios.
 
@@ -52,7 +54,7 @@ No aplicar a producción sin respaldar, revisar RLS y probar cada rol. No se cre
 
 ## Estado y limitaciones
 
-El código contiene flujos operativos y RPC transaccionales, pero esta entrega no equivale a una certificación de producción: la migración nueva no se ha aplicado a tu proyecto remoto y no se pudo ejecutar `pnpm install`, `pnpm typecheck` o `pnpm build` en el entorno de generación. Las pruebas Node incluidas son de lógica/contratos, no sustituyen pruebas SQL/E2E reales.
+El inventario incluye catálogo de productos y categorías, edición, archivo lógico, existencias agregadas por depósito, mínimos, alertas y registro/historial de movimientos. La migración `20261112230500_inventory_catalog_soft_deactivation` ya está aplicada al proyecto Supabase remoto y registrada en su historial. La desactivación es lógica: conserva compras, ventas, movimientos y referencias históricas. Esta entrega no equivale a una certificación de producción; deben pasar las pruebas `pnpm test`, `pnpm typecheck` y `pnpm build` y una revisión funcional de los flujos reales antes de considerar el despliegue productivo.
 
 La facturación fiscal venezolana requiere proveedor autorizado, credenciales y validación real de documentos ante el mecanismo fiscal aplicable. El sistema no debe presentar sus documentos internos como facturas fiscales autorizadas. También quedan fuera devoluciones/reembolsos y reversión formal de ventas hasta implementar y probar su flujo contable e inventario.
 
