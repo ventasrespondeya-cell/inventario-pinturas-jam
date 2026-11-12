@@ -32,6 +32,9 @@ export default function OperationsPage() {
   const [categories, setCategories] = useState<Row[]>([])
   const [selectedCategory, setSelectedCategory] = useState('')
   const [categoryName, setCategoryName] = useState('')
+  const [editingCategoryId, setEditingCategoryId] = useState('')
+  const [showInactive, setShowInactive] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Row | null>(null)
   const [productName, setProductName] = useState('')
   const [productSku, setProductSku] = useState('')
   const [productCategory, setProductCategory] = useState('')
@@ -116,7 +119,7 @@ export default function OperationsPage() {
   useEffect(() => {
     if (!user) return
     let mounted = true
-    catalog.listCategories().then((result) => {
+    catalog.listCategories(true).then((result) => {
       if (mounted && result.ok) setCategories(result.data as Row[])
     })
     return () => { mounted = false }
@@ -179,11 +182,19 @@ export default function OperationsPage() {
       }
       let result
       if (section === 'Inventario') {
-        const [products, stock] = await Promise.all([catalog.listProducts(search), inventory.stock(search)])
+        const [products, stock] = await Promise.all([catalog.listProducts(search, true), inventory.stock(search)])
         if (!products.ok) throw new Error(products.error.message)
         if (!stock.ok) throw new Error(stock.error.message)
-        const stockByProduct = new Map((stock.data as Row[]).map((r) => [String(r.product_id ?? r.productId), r]))
-        setRows((products.data as Row[]).map((p) => ({ ...p, ...(stockByProduct.get(String(p.id)) ?? {}) })))
+        const stockByProduct = new Map<string, Row>()
+        for (const item of stock.data as Row[]) {
+          const id = String(item.product_id ?? item.productId)
+          const current = stockByProduct.get(id) ?? { quantity: 0, minimum_stock: 0, warehouse_count: 0 }
+          current.quantity = Number(current.quantity ?? 0) + Number(item.quantity ?? 0)
+          current.minimum_stock = Number(current.minimum_stock ?? 0) + Number(item.minimum_stock ?? 0)
+          current.warehouse_count = Number(current.warehouse_count ?? 0) + 1
+          stockByProduct.set(id, current)
+        }
+        setRows((products.data as Row[]).map((p) => ({ ...p, ...(stockByProduct.get(String(p.id)) ?? { quantity: 0, minimum_stock: 0, warehouse_count: 0 }) })))
       } else {
         switch (section) {
           case 'Compras': result = await purchases.listPurchases({}); break
@@ -216,11 +227,11 @@ export default function OperationsPage() {
     e.preventDefault()
     if (!user) return
     setBusy(true); setMessage('')
-    const result = await catalog.saveCategory(categoryName, { userId: user.id })
+    const result = await catalog.saveCategory(categoryName, { userId: user.id }, editingCategoryId || undefined)
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
-    setCategoryName('')
-    const refreshed = await catalog.listCategories()
+    setCategoryName(''); setEditingCategoryId('')
+    const refreshed = await catalog.listCategories(true)
     if (refreshed.ok) setCategories(refreshed.data as Row[])
     setMessage('Categoría guardada correctamente.')
   }
@@ -243,6 +254,7 @@ export default function OperationsPage() {
     e.preventDefault()
     if (!user) return
     const input: ProductInput = {
+      ...(editingProduct?.id ? { id: String(editingProduct.id) } : {}),
       name: productName.trim(),
       sku: null,
       brand: null,
@@ -256,10 +268,52 @@ export default function OperationsPage() {
     const result = await catalog.saveProduct(input, { userId: user.id })
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
-    setProductName(''); setProductPresentation('')
-    setProductColor(''); setProductPrice('')
+    setProductName(''); setProductPresentation(''); setProductCategory(''); setProductUnit('unidad')
+    setProductColor(''); setProductPrice(''); setEditingProduct(null)
     setMessage('Producto guardado correctamente.')
     await load()
+  }
+
+  function beginEditProduct(product: Row) {
+    setEditingProduct(product)
+    setProductName(String(product.name ?? ''))
+    setProductCategory(String(product.category_id ?? ''))
+    setProductPresentation(String(product.presentation ?? ''))
+    setProductUnit(String(product.unit ?? 'unidad'))
+    setProductColor(String(product.color ?? ''))
+    setProductPrice(String(product.sale_price ?? ''))
+    setMessage('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function toggleProductActive(product: Row) {
+    if (!user) return
+    const active = product.active !== false
+    const prompt = active
+      ? '¿Desactivar este producto? Se conservarán sus documentos y movimientos históricos. No podrá desactivarse si tiene existencias.'
+      : '¿Reactivar este producto?'
+    if (!window.confirm(prompt)) return
+    setBusy(true); setMessage('')
+    const result = await catalog.setProductActive(String(product.id), !active, { userId: user.id })
+    setBusy(false)
+    if (!result.ok) { setMessage(result.error.message); return }
+    setMessage(active ? 'Producto desactivado; el historial se conservó.' : 'Producto reactivado.')
+    await load()
+  }
+
+  async function toggleCategoryActive(category: Row) {
+    if (!user) return
+    const active = category.active !== false
+    if (!window.confirm(active
+      ? '¿Desactivar esta categoría? Primero reasigna o desactiva sus productos activos.'
+      : '¿Reactivar esta categoría?')) return
+    setBusy(true); setMessage('')
+    const result = await catalog.setCategoryActive(String(category.id), !active, { userId: user.id })
+    setBusy(false)
+    if (!result.ok) { setMessage(result.error.message); return }
+    const refreshed = await catalog.listCategories(true)
+    if (refreshed.ok) setCategories(refreshed.data as Row[])
+    setMessage(active ? 'Categoría desactivada.' : 'Categoría reactivada.')
   }
 
   function addCartLine(e: FormEvent) {
@@ -366,7 +420,7 @@ export default function OperationsPage() {
 
   const columns = useMemo(() => {
     const preferred: Record<Section, string[]> = {
-      Inventario: ['name','category_id','presentation','color','sale_price','quantity','minimum_stock','stock_status'],
+      Inventario: ['name','category_id','presentation','color','sale_price','quantity','minimum_stock','stock_status','actions'],
       Compras: ['document_number','document_date','currency','status','total','created_at'],
       Ventas: ['sale_number','sale_date','currency','status','total','created_at'],
       Cotizaciones: ['quote_number','quote_date','currency','status','total','valid_until'],
@@ -375,15 +429,16 @@ export default function OperationsPage() {
       Reportes: [],
     }
     const keys = new Set(rows.flatMap((r) => Object.keys(r)))
-    const selected = preferred[section].filter((k) => k === 'stock_status' || keys.has(k))
+    const selected = preferred[section].filter((k) => k === 'stock_status' || k === 'actions' || keys.has(k))
     return selected.length ? selected : [...keys].slice(0, 7)
   }, [rows, section])
 
-  const inventoryStats = useMemo(() => ({ total: rows.length, units: rows.reduce((sum, r) => sum + Number(r.quantity ?? 0), 0), low: rows.filter((r) => Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0)).length, out: rows.filter((r) => Number(r.quantity ?? 0) <= 0).length }), [rows])
+  const inventoryRows = useMemo(() => rows.filter((r) => showInactive || r.active !== false), [rows, showInactive])
+  const inventoryStats = useMemo(() => ({ total: inventoryRows.length, units: inventoryRows.reduce((sum, r) => sum + Number(r.quantity ?? 0), 0), low: inventoryRows.filter((r) => r.active !== false && Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0)).length, out: inventoryRows.filter((r) => r.active !== false && Number(r.quantity ?? 0) <= 0).length }), [inventoryRows])
 
   const visibleRows = useMemo(() => section === 'Inventario' && selectedCategory
-    ? rows.filter((r) => String(r.category_id ?? '') === selectedCategory)
-    : rows, [rows, section, selectedCategory])
+    ? inventoryRows.filter((r) => String(r.category_id ?? '') === selectedCategory)
+    : section === 'Inventario' ? inventoryRows : rows, [rows, section, selectedCategory, inventoryRows])
 
   if (!ready) return <main className="min-h-screen bg-slate-50 p-8 text-slate-700">Cargando sesión segura…</main>
 
@@ -510,7 +565,7 @@ export default function OperationsPage() {
       </form>
       <form onSubmit={createProduct} className="mt-3 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-4">
         <label className="text-sm">Nombre del producto *<input required value={productName} onChange={(e) => setProductName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
-        <label className="text-sm">Categoría<select value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Sin categoría</option>{categories.map((c) => <option key={String(c.id)} value={String(c.id)}>{String(c.name)}</option>)}</select></label>
+        <label className="text-sm">Categoría<select value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Sin categoría</option>{categories.filter((c) => c.active !== false).map((c) => <option key={String(c.id)} value={String(c.id)}>{String(c.name)}</option>)}</select></label>
         <label className="text-sm">Presentación<input value={productPresentation} onChange={(e) => setProductPresentation(e.target.value)} placeholder="Galón, cuñete…" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <label className="text-sm">Unidad<select value={productUnit} onChange={(e) => setProductUnit(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="unidad">Unidad</option><option value="galón">Galón</option><option value="cuñete">Cuñete</option><option value="litro">Litro</option><option value="kilogramo">Kilogramo</option></select></label>
         <label className="text-sm">Color<input value={productColor} onChange={(e) => setProductColor(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
