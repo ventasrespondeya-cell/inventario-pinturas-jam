@@ -46,7 +46,7 @@ export default function OperationsPage() {
   const [minimumWarehouse, setMinimumWarehouse] = useState('')
   const [minimumProduct, setMinimumProduct] = useState('')
   const [minimumValue, setMinimumValue] = useState('0')
-  const [inventoryView, setInventoryView] = useState<'products' | 'movements' | 'alerts'>('products')
+  const [inventoryView, setInventoryView] = useState<'products' | 'categories' | 'minimum' | 'movements' | 'alerts'>('products')
   const [movementRows, setMovementRows] = useState<Row[]>([])
   const [movementType, setMovementType] = useState<'entry' | 'exit' | 'adjustment'>('entry')
   const [movementProduct, setMovementProduct] = useState('')
@@ -488,133 +488,81 @@ export default function OperationsPage() {
   if (!ready) return <main className="min-h-screen bg-slate-50 p-8 text-slate-700">Cargando sesión segura…</main>
 
   if (!user) return (
-    <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#f3f5fa] px-4 py-10 text-slate-900 sm:px-6">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-40 -top-40 h-[34rem] w-[34rem] rounded-full bg-blue-200/50 blur-3xl" />
-        <div className="absolute -bottom-48 -right-40 h-[38rem] w-[38rem] rounded-full bg-orange-200/50 blur-3xl" />
-        <div className="absolute inset-0 opacity-[0.22]" style={{ backgroundImage: 'radial-gradient(#64748b 0.7px, transparent 0.7px)', backgroundSize: '22px 22px' }} />
-      </div>
-
-      <div className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_30px_100px_-35px_rgba(15,35,80,0.38)] lg:min-h-[610px] lg:grid-cols-[1.02fr_0.98fr]">
-        <section className="relative flex flex-col items-center justify-center overflow-hidden bg-[#142b59] px-7 py-10 text-center text-white sm:px-12 lg:px-14">
-          <div aria-hidden="true" className="absolute -right-24 -top-24 h-72 w-72 rounded-full border border-white/10" />
-          <div aria-hidden="true" className="absolute -bottom-32 -left-24 h-96 w-96 rounded-full border border-white/10" />
-          <div aria-hidden="true" className="absolute right-0 top-0 h-2 w-full bg-gradient-to-r from-orange-400 via-pink-500 to-cyan-400" />
-          <div className="relative z-10 flex w-full max-w-sm flex-col items-center">
-            <div className="mb-7 rounded-full bg-white p-2 shadow-2xl ring-1 ring-white/30">
-              <Image src="/pinturas-jam-logo.jpg" alt="Logo oficial de Pinturas JAM" width={220} height={220} priority className="h-40 w-40 rounded-full object-contain sm:h-48 sm:w-48" />
-            </div>
-            <p className="text-xs font-bold uppercase tracking-[0.32em] text-blue-200">Excelencia en pinturas</p>
-            <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">PINTURAS JAM</h1>
-            <p className="mt-4 max-w-xs text-sm leading-7 text-blue-100/85">
-              Tu espacio de trabajo para administrar inventario, ventas y operaciones de forma segura.
-            </p>
-            <div className="mt-9 flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-blue-100 backdrop-blur">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
-              Plataforma de gestión comercial
-            </div>
-          </div>
-        </section>
-
-        <section className="flex items-center justify-center px-6 py-10 sm:px-12 lg:px-14">
-          <div className="w-full max-w-md">
-            <div className="mb-8">
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-600">Acceso autorizado</p>
-              <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-[#142b59] sm:text-4xl">Iniciar sesión</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-500">
-                Ingresa con tu correo y contraseña de usuario autorizado para continuar.
-              </p>
-            </div>
-
-            <form onSubmit={signIn} className="space-y-5">
-              <label className="block text-sm font-semibold text-slate-700">
-                Correo electrónico
-                <span className="relative mt-2 block">
-                  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400">
-                    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>
-                  </span>
-                  <input className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-700 focus:bg-white focus:ring-4 focus:ring-blue-100" type="email" autoComplete="username" placeholder="nombre@empresa.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
-                </span>
-              </label>
-
-              <label className="block text-sm font-semibold text-slate-700">
-                Contraseña
-                <span className="relative mt-2 block">
-                  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400">
-                    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /><path d="M12 14v3" /></svg>
-                  </span>
-                  <input className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-700 focus:bg-white focus:ring-4 focus:ring-blue-100" type="password" autoComplete="current-password" placeholder="Tu contraseña" required value={password} onChange={(e) => setPassword(e.target.value)} />
-                </span>
-              </label>
-
-              <button disabled={busy} className="group flex w-full items-center justify-center gap-3 rounded-xl bg-[#142b59] px-5 py-4 text-sm font-bold tracking-wide text-white shadow-lg shadow-blue-950/15 transition hover:-translate-y-0.5 hover:bg-[#1d3b77] hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200 disabled:cursor-not-allowed disabled:opacity-60">
-                {busy ? 'Verificando acceso…' : 'ENTRAR AL SISTEMA'}
-                {!busy && <span aria-hidden="true" className="text-lg transition-transform group-hover:translate-x-1">→</span>}
-              </button>
-            </form>
-
-            {message && <p role="alert" className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm leading-6 text-red-700">{message}</p>}
-
-            <div className="mt-7 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-              <p className="text-xs leading-5 text-slate-500">
-                <span className="font-semibold text-slate-700">Acceso protegido.</span> Solo pueden ingresar usuarios previamente creados y autorizados en Supabase. Esta pantalla no crea cuentas ni permisos.
-              </p>
-            </div>
-
-            <a className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-[#244477] transition hover:text-orange-600" href="/">
-              <span aria-hidden="true">←</span> Volver al panel visual
-            </a>
-            <p className="mt-8 border-t border-slate-100 pt-5 text-[11px] leading-5 text-slate-400">
-              Configuración técnica: NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Nunca exponer service_role en el navegador.
-            </p>
-          </div>
-        </section>
-      </div>
+    <main className="flex min-h-screen items-center justify-center bg-[#f5f7fa] px-4 py-10 text-slate-900">
+      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-9">
+        <div className="mb-7 flex items-center gap-3">
+          <Image src="/pinturas-jam-logo.jpg" alt="Pinturas JAM" width={56} height={56} className="h-14 w-14 rounded-full object-contain" priority />
+          <div><p className="text-lg font-bold tracking-tight text-[#172b4d]">Pinturas JAM</p><p className="text-xs text-slate-500">Sistema de gestión</p></div>
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Iniciar sesión</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500">Ingresa con tu usuario autorizado para continuar.</p>
+        <form onSubmit={signIn} className="mt-7 space-y-4">
+          <label className="block text-sm font-medium text-slate-700">Correo electrónico
+            <input className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-[#244477] focus:ring-2 focus:ring-blue-100" type="email" autoComplete="username" placeholder="nombre@empresa.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">Contraseña
+            <input className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-[#244477] focus:ring-2 focus:ring-blue-100" type="password" autoComplete="current-password" placeholder="Tu contraseña" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          </label>
+          <button disabled={busy} className="flex w-full items-center justify-center rounded-lg bg-[#172b4d] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#213d67] disabled:opacity-60">{busy ? 'Verificando…' : 'Entrar al sistema'}</button>
+        </form>
+        {message && <p role="alert" className="mt-4 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">{message}</p>}
+        <p className="mt-6 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-400">Acceso protegido. Solo pueden ingresar usuarios previamente autorizados.</p>
+      </section>
     </main>
   )
 
-  return <main className="min-h-screen bg-[#f4f6fa] text-slate-900"><div className="mx-auto flex min-h-screen max-w-[1600px] flex-col md:flex-row">
-    <aside className="w-full shrink-0 bg-[#172b4d] px-4 py-4 text-white md:w-60 md:px-5 md:py-7">
-      <div className="px-2 pb-4 md:pb-9"><p className="text-2xl font-black tracking-wide">JAM</p><p className="mt-1 text-[10px] font-semibold tracking-[0.32em] text-blue-200">PINTURAS</p></div>
-      <p className="mb-2 hidden px-2 text-[10px] font-bold tracking-[0.18em] text-blue-200 md:block">MENÚ PRINCIPAL</p>
-      <nav className="flex flex-wrap gap-1 md:flex-col">{sections.map((s) => <button key={s} onClick={() => { setSection(s); setSearch(''); setSelectedCategory('') }} className={`rounded-lg px-3 py-3 text-left text-sm font-semibold transition ${section === s ? 'bg-[#2e4770] text-white shadow-inner' : 'text-blue-100 hover:bg-white/10'}`}>{s === 'Inventario' ? '▦  ' : s === 'Compras' ? '＋  ' : s === 'Ventas' ? '↗  ' : s === 'Cotizaciones' ? '▤  ' : s === 'Reportes' ? '▥  ' : '$  '}{s}</button>)}</nav>
-      <div className="mt-8 hidden border-t border-white/10 px-2 pt-4 text-xs text-blue-200 md:block">Gestión comercial JAM</div>
-    </aside>
-    <div className="min-w-0 flex-1">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 md:px-8">
-        <div><p className="text-xs font-bold tracking-[.18em] text-orange-600">PINTURAS JAM · OPERACIONES</p><h1 className="mt-1 text-2xl font-bold">{section}</h1><p className="mt-1 text-xs text-slate-500">Sesión: {user.email ?? user.id}</p></div>
-        <div className="flex gap-2"><button onClick={() => void load()} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">Actualizar</button><button onClick={() => void signOut()} className="rounded-lg bg-[#172b4d] px-4 py-2 text-sm font-semibold text-white">Cerrar sesión</button></div>
-      </header>
-      <div className="p-4 md:p-8">
+  return <main className="min-h-screen bg-[#f5f7fa] text-slate-900">
+    <div className="mx-auto flex min-h-screen max-w-[1680px] flex-col md:flex-row">
+      <aside className="w-full shrink-0 bg-[#172b4d] px-4 py-4 text-white md:sticky md:top-0 md:h-screen md:w-64 md:px-5 md:py-6">
+        <div className="flex items-center gap-3 px-2 pb-4 md:pb-8">
+          <Image src="/pinturas-jam-logo.jpg" alt="" width={42} height={42} className="h-10 w-10 rounded-full bg-white object-contain" />
+          <div><p className="text-base font-bold">Pinturas JAM</p><p className="mt-0.5 text-[11px] text-blue-200">Gestión comercial</p></div>
+        </div>
+        <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-blue-200">Menú principal</p>
+        <nav aria-label="Navegación principal" className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
+          {sections.map((item) => <button key={item} type="button" onClick={() => { setSection(item); setSearch(''); setSelectedCategory('') }} aria-current={section === item ? 'page' : undefined} className={`shrink-0 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition md:w-full ${section === item ? 'bg-white text-[#172b4d]' : 'text-blue-100 hover:bg-white/10'}`}>{item}</button>)}
+        </nav>
+        <div className="mt-6 hidden border-t border-white/10 px-2 pt-4 text-xs text-blue-200 md:block">Pinturas JAM · Sistema interno</div>
+      </aside>
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6 md:px-8">
+          <div><p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Pinturas JAM</p><h1 className="mt-0.5 text-xl font-bold text-[#172b4d] sm:text-2xl">{section}</h1></div>
+          <div className="flex items-center gap-2">
+            <span className="hidden max-w-[180px] truncate text-xs text-slate-500 sm:block">{user.email ?? user.id}</span>
+            <button onClick={() => void load()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Actualizar</button>
+            <button onClick={() => void signOut()} className="rounded-lg bg-[#172b4d] px-3 py-2 text-sm font-semibold text-white hover:bg-[#213d67]">Salir</button>
+          </div>
+        </header>
+        <div className="p-4 sm:p-6 md:p-8">
       {notice && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{notice}</p>}
-    <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">{section}</h2><p className="text-sm text-slate-500">Datos leídos desde las tablas/RPC del proyecto Supabase autenticado.</p></div><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Buscar ${section.toLowerCase()}…`} className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm" /></div>
+    <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="mb-5 flex flex-wrap items-center justify-end gap-3">{(section !== 'Inventario' || inventoryView === 'products' || inventoryView === 'alerts') && <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Buscar ${section.toLowerCase()}…`} aria-label={`Buscar ${section.toLowerCase()}`} className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#244477] focus:ring-2 focus:ring-blue-100" />}</div>
      {section === 'Inventario' && <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Total de productos</p><p className="mt-2 text-2xl font-bold">{inventoryStats.total}</p><p className="mt-1 text-[11px] text-slate-400">Productos registrados</p></div>
        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Unidades disponibles</p><p className="mt-2 text-2xl font-bold">{inventoryStats.units.toLocaleString('es-VE')}</p><p className="mt-1 text-[11px] text-slate-400">Existencia total</p></div>
        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm"><p className="text-xs text-amber-800">Stock bajo</p><p className="mt-2 text-2xl font-bold text-amber-700">{inventoryStats.low}</p><p className="mt-1 text-[11px] text-amber-700">En el mínimo o por debajo</p></div>
        <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm"><p className="text-xs text-red-800">Agotados</p><p className="mt-2 text-2xl font-bold text-red-700">{inventoryStats.out}</p><p className="mt-1 text-[11px] text-red-700">Sin existencias</p></div>
      </div>}
-    {section === 'Inventario' && <div className="mb-4 flex flex-wrap gap-2">
-       <button type="button" onClick={() => setInventoryView('products')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${inventoryView === 'products' ? 'bg-[#172b4d] text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>Productos</button>
-       <button type="button" onClick={() => setInventoryView('movements')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${inventoryView === 'movements' ? 'bg-[#172b4d] text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>Movimientos</button>
-       <button type="button" onClick={() => setInventoryView('alerts')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${inventoryView === 'alerts' ? 'bg-[#172b4d] text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>Alertas de stock</button>
-     </div>}
-    {section === 'Inventario' && inventoryView === 'products' && <>
-       <form onSubmit={saveMinimumStock} className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-4">
+    {section === 'Inventario' && <nav aria-label="Apartados de inventario" className="mb-5 flex gap-2 overflow-x-auto border-b border-slate-200 pb-2">
+      {([{id:'products',label:'Productos'},{id:'categories',label:'Categorías'},{id:'minimum',label:'Stock mínimo'},{id:'movements',label:'Movimientos'},{id:'alerts',label:'Alertas'}] as const).map((tab) => <button key={tab.id} type="button" onClick={() => setInventoryView(tab.id)} aria-current={inventoryView === tab.id ? 'page' : undefined} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition ${inventoryView === tab.id ? 'bg-[#172b4d] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{tab.label}</button>)}
+    </nav>}
+    {section === 'Inventario' && ['products', 'categories', 'minimum'].includes(inventoryView) && <>
+      {inventoryView === 'minimum' && <div className="max-w-3xl"><form onSubmit={saveMinimumStock} className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-4">
          <div className="md:col-span-4"><h3 className="font-semibold text-slate-800">Configurar stock mínimo</h3><p className="mt-1 text-xs text-slate-600">Se mostrará una alerta cuando la existencia llegue al mínimo o quede por debajo.</p></div>
          <label className="text-sm">Producto<select required value={minimumProduct} onChange={(e) => setMinimumProduct(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar producto…</option>{rows.map((r) => <option key={String(r.id)} value={String(r.id)}>{String(r.name)}</option>)}</select></label>
          <label className="text-sm">Depósito<select required value={minimumWarehouse} onChange={(e) => setMinimumWarehouse(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar depósito…</option>{inventoryWarehouses.map((w) => <option key={String(w.id)} value={String(w.id)}>{String(w.name)}</option>)}</select></label>
          <label className="text-sm">Cantidad mínima<input required min="0" step="0.000001" type="number" value={minimumValue} onChange={(e) => setMinimumValue(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>
          <button disabled={busy} className="self-end rounded-lg bg-[#172b4d] px-4 py-2 font-semibold text-white disabled:opacity-50">Guardar mínimo</button>
-       </form>
-      <form onSubmit={createCategory} className="mt-5 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-4">
+       </form></div>}
+      {inventoryView === 'categories' && <div className="max-w-3xl space-y-4"><form onSubmit={createCategory} className="mt-5 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-4">
          <div className="w-full text-sm font-semibold">{editingCategoryId ? "Editar categoría" : "Administrar categorías"}</div>
         <label className="min-w-0 flex-1 text-sm font-medium">Nueva categoría
           <input required maxLength={80} value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="Ej. Pinturas interiores" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
         </label>
         <button disabled={busy} className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-semibold disabled:opacity-50">{editingCategoryId ? "Guardar cambios" : "Crear categoría"}</button>{editingCategoryId && <button type="button" onClick={() => { setEditingCategoryId(""); setCategoryName("") }} className="rounded-lg border border-slate-300 bg-white px-4 py-2">Cancelar</button>}
       </form>
-      <form onSubmit={createProduct} className="mt-3 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-4">
+        <div className="mt-3 rounded-xl border border-slate-200 p-3"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Editar o desactivar categorías</p><div className="flex flex-wrap gap-2">{categories.map((c) => <div key={String(c.id)} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="font-semibold">{String(c.name)}</span>{c.active === false && <span className="text-amber-700">Inactiva</span>}<button type="button" onClick={() => { setEditingCategoryId(String(c.id)); setCategoryName(String(c.name)) }} className="font-semibold text-blue-700 underline">Editar</button><button type="button" onClick={() => void toggleCategoryActive(c)} disabled={busy} className="font-semibold text-red-700 underline">{c.active === false ? "Reactivar" : "Desactivar"}</button></div>)}</div></div>
+      </div>}
+      {inventoryView === 'products' && <div className="space-y-4"><form onSubmit={createProduct} className="mt-3 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-4">
          <div className="md:col-span-4 text-sm font-semibold">{editingProduct ? "Editar producto" : "Agregar producto"}</div>
         <label className="text-sm">Nombre del producto *<input required value={productName} onChange={(e) => setProductName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <label className="text-sm">Categoría<select value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Sin categoría</option>{categories.filter((c) => c.active !== false).map((c) => <option key={String(c.id)} value={String(c.id)}>{String(c.name)}</option>)}</select></label>
@@ -624,9 +572,9 @@ export default function OperationsPage() {
         <label className="text-sm">Precio de venta<input inputMode="decimal" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} placeholder="Ej. 12.50" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <div className="flex flex-wrap gap-2 md:col-span-4"><button disabled={busy} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{editingProduct ? "Guardar cambios" : "Guardar producto"}</button>{editingProduct && <button type="button" onClick={() => { setEditingProduct(null); setProductName(""); setProductCategory(""); setProductPresentation(""); setProductColor(""); setProductPrice("") }} className="rounded-lg border border-slate-300 px-4 py-2">Cancelar edición</button>}</div>
       </form>
-      <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => setSelectedCategory('')} className="rounded-full border px-3 py-1 text-xs">Todas las categorías</button>{categories.filter((c) => c.active !== false).map((c) => <button key={String(c.id)} onClick={() => setSelectedCategory(String(c.id))} className={`rounded-full border px-3 py-1 text-xs ${selectedCategory === String(c.id) ? 'border-orange-400 bg-orange-100 text-orange-900' : 'border-slate-200 bg-white text-slate-700'}`}>{String(c.name)}</button>)}</div>
-       <div className="mt-3 rounded-xl border border-slate-200 p-3"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Editar o desactivar categorías</p><div className="flex flex-wrap gap-2">{categories.map((c) => <div key={String(c.id)} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="font-semibold">{String(c.name)}</span>{c.active === false && <span className="text-amber-700">Inactiva</span>}<button type="button" onClick={() => { setEditingCategoryId(String(c.id)); setCategoryName(String(c.name)) }} className="font-semibold text-blue-700 underline">Editar</button><button type="button" onClick={() => void toggleCategoryActive(c)} disabled={busy} className="font-semibold text-red-700 underline">{c.active === false ? "Reactivar" : "Desactivar"}</button></div>)}</div></div>
-       <label className="mt-3 inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> Mostrar productos desactivados</label>
+        <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => setSelectedCategory('')} className="rounded-full border px-3 py-1 text-xs">Todas las categorías</button>{categories.filter((c) => c.active !== false).map((c) => <button key={String(c.id)} onClick={() => setSelectedCategory(String(c.id))} className={`rounded-full border px-3 py-1 text-xs ${selectedCategory === String(c.id) ? 'border-orange-400 bg-orange-100 text-orange-900' : 'border-slate-200 bg-white text-slate-700'}`}>{String(c.name)}</button>)}</div>
+        <label className="mt-3 inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> Mostrar productos desactivados</label>
+      </div>}
     </>}
     {section === 'Inventario' && inventoryView === 'movements' && <div className="mt-4 space-y-4">
        <form onSubmit={saveInventoryMovement} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-5">
@@ -670,6 +618,6 @@ export default function OperationsPage() {
     {section === 'Cuentas por pagar' && <div className="mt-5 rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Registrar pago a proveedor</h2><div className="mt-3 grid gap-3 md:grid-cols-4"><label className="text-sm md:col-span-2">Cuenta pendiente<select value={selectedPayable} onChange={e=>{setSelectedPayable(e.target.value);setSupplierPayAmount('')}} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar cuenta…</option>{payableRows.filter(x=>String(x.status)!=='paid').map(x=><option key={String(x.id)} value={String(x.id)}>{String(x.supplier_id)} · {String(x.balance ?? x.original_amount)} {String(x.currency)} · {String(x.status)}</option>)}</select></label><label className="text-sm">Importe<input value={supplierPayAmount} onChange={e=>setSupplierPayAmount(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Método<select value={supplierPayMethod} onChange={e=>setSupplierPayMethod(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{supplierPaymentMethods.map(m=><option key={String(m.id)} value={String(m.name)}>{String(m.name)}</option>)}</select></label><label className="text-sm md:col-span-3">Referencia<input value={supplierPayReference} onChange={e=>setSupplierPayReference(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={registerSupplierPayment} disabled={busy || !selectedPayable} className="self-end rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white">Registrar pago</button></div><p className="mt-3 text-xs text-slate-500">El pago respeta moneda, saldo y método autorizado. En cuentas USD, la base exige tasa BCV para la fecha del pago. El movimiento de caja queda en cola para el consumidor de Chat 4.</p></div>}
     {section === 'Reportes' && <div className="mt-5 space-y-5"><div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 p-4"><label className="text-sm">Desde<input type="date" value={reportFrom} onChange={e=>setReportFrom(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Hasta<input type="date" value={reportTo} onChange={e=>setReportTo(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={()=>void load()} disabled={busy || reportFrom>reportTo} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Generar reporte</button></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[{label:'Ventas registradas',value:String(reportSales.length)},{label:'Compras registradas',value:String(reportPurchases.length)},{label:'Cuentas por cobrar',value:String(reportReceivables.length)},{label:'Cuentas por pagar',value:String(reportPayables.length)}].map(x=><div key={x.label} className="rounded-xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">{x.label}</p><p className="mt-2 text-3xl font-bold">{x.value}</p></div>)}</div><div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Eventos comerciales pendientes de sincronizar: {reportCashPending}.</strong><p className="mt-1">Son cobros y pagos aún no importados a un turno de caja de la misma moneda. Abre caja y ejecuta la sincronización para incorporarlos al arqueo.</p></div><div className="grid gap-4 lg:grid-cols-2"><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Ventas del período</h2><p className="mt-1 text-xs text-slate-500">Listado real desde Supabase; importes separados por moneda.</p><div className="mt-3 space-y-2">{reportSales.length?reportSales.map((r,i)=><div key={String(r.id??i)} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{String(r.sale_number??r.id??'Venta')} · {String(r.sale_date??'')}</span><strong>{String(r.total??'—')} {String(r.currency??'')}</strong></div>):<p className="text-sm text-slate-500">Sin ventas en el período.</p>}</div></div><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Compras del período</h2><p className="mt-1 text-xs text-slate-500">Listado real desde Supabase; importes separados por moneda.</p><div className="mt-3 space-y-2">{reportPurchases.length?reportPurchases.map((r,i)=><div key={String(r.id??i)} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{String(r.document_number??r.id??'Compra')} · {String(r.document_date??'')}</span><strong>{String(r.total??'—')} {String(r.currency??'')}</strong></div>):<p className="text-sm text-slate-500">Sin compras en el período.</p>}</div></div></div></div>}
     {message && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{message}</p>}
-    {!(section === 'Inventario' && inventoryView === 'movements') && <div className="mt-5 overflow-x-auto">{busy ? <p className="p-8 text-center text-sm text-slate-500">Consultando…</p> : visibleRows.length === 0 ? <div className="p-10 text-center"><p className="font-semibold">No hay registros para mostrar</p><p className="mt-1 text-sm text-slate-500">Puede que aún no existan datos, que falte aplicar la migración correspondiente o que tu usuario no tenga acceso al negocio.</p></div> : <table className="w-full min-w-[640px] border-collapse text-left text-sm"><thead><tr>{columns.map((c) => <th key={c} className="border-b border-slate-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{({name:'Producto',category_id:'Categoría',presentation:'Presentación',color:'Color',sale_price:'Precio',quantity:'Existencia',minimum_stock:'Stock mínimo',stock_status:'Estado',actions:'Acciones'} as Record<string,string>)[c] ?? c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{visibleRows.map((r,i) => <tr key={String(r.id ?? i)} onClick={section === 'Compras' ? () => void openPurchase(String(r.id)) : undefined} className={`odd:bg-slate-50 ${section === 'Compras' ? 'cursor-pointer hover:bg-orange-50' : ''}`}>{columns.map((c) => <td key={c} className="max-w-xs border-b border-slate-100 px-3 py-3 text-slate-700">{c === 'actions' && section === 'Inventario' ? <div className="flex min-w-36 flex-wrap gap-2"><button type="button" onClick={(e) => { e.stopPropagation(); beginEditProduct(r) }} className="font-semibold text-blue-700 underline">Editar</button><button type="button" onClick={(e) => { e.stopPropagation(); void toggleProductActive(r) }} disabled={busy} className="font-semibold text-red-700 underline">{r.active === false ? "Reactivar" : "Desactivar"}</button></div> : c === 'category_id' ? String(categories.find((cat) => String(cat.id) === String(r[c]))?.name ?? 'Sin categoría') : c === 'stock_status' ? Number(r.quantity ?? 0) <= 0 ? <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700">Agotado</span> : Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) < Number(r.minimum_stock ?? 0) ? <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-800">Reponer</span> : Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) === Number(r.minimum_stock ?? 0) ? <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">Stock bajo</span> : <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">Disponible</span> : pretty(r[c])}</td>)}</tr>)}</tbody></table>}</div>}
-    </section><p className="mt-4 text-xs text-slate-500">Reportes consultan ventas, compras y saldos directamente desde Supabase. Ventas y cotizaciones cuentan con formularios conectados a los RPC comerciales; la confirmación de venta descuenta inventario de forma transaccional. Caja y cierres cuentan con su módulo transaccional; la factura fiscal requiere emisor autorizado y validación legal.</p><div className="mt-4 flex flex-wrap gap-4"><a href="/caja" className="inline-block text-sm font-semibold text-orange-700 underline">Abrir caja y cierres</a><a href="/administracion" className="inline-block text-sm font-semibold text-orange-700 underline">Administración y auditoría</a><a href="/" className="inline-block text-sm text-orange-700 underline">Volver al panel visual</a></div></div></div></div></main>
+    {!(section === 'Inventario' && ['movements', 'categories', 'minimum'].includes(inventoryView)) && <div className="mt-5 overflow-x-auto">{busy ? <p className="p-8 text-center text-sm text-slate-500">Consultando…</p> : visibleRows.length === 0 ? <div className="p-10 text-center"><p className="font-semibold">No hay registros para mostrar</p><p className="mt-1 text-sm text-slate-500">Puede que aún no existan datos, que falte aplicar la migración correspondiente o que tu usuario no tenga acceso al negocio.</p></div> : <table className="w-full min-w-[640px] border-collapse text-left text-sm"><thead><tr>{columns.map((c) => <th key={c} className="border-b border-slate-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{({name:'Producto',category_id:'Categoría',presentation:'Presentación',color:'Color',sale_price:'Precio',quantity:'Existencia',minimum_stock:'Stock mínimo',stock_status:'Estado',actions:'Acciones'} as Record<string,string>)[c] ?? c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{visibleRows.map((r,i) => <tr key={String(r.id ?? i)} onClick={section === 'Compras' ? () => void openPurchase(String(r.id)) : undefined} className={`odd:bg-slate-50 ${section === 'Compras' ? 'cursor-pointer hover:bg-orange-50' : ''}`}>{columns.map((c) => <td key={c} className="max-w-xs border-b border-slate-100 px-3 py-3 text-slate-700">{c === 'actions' && section === 'Inventario' ? <div className="flex min-w-36 flex-wrap gap-2"><button type="button" onClick={(e) => { e.stopPropagation(); beginEditProduct(r) }} className="font-semibold text-blue-700 underline">Editar</button><button type="button" onClick={(e) => { e.stopPropagation(); void toggleProductActive(r) }} disabled={busy} className="font-semibold text-red-700 underline">{r.active === false ? "Reactivar" : "Desactivar"}</button></div> : c === 'category_id' ? String(categories.find((cat) => String(cat.id) === String(r[c]))?.name ?? 'Sin categoría') : c === 'stock_status' ? Number(r.quantity ?? 0) <= 0 ? <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700">Agotado</span> : Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) < Number(r.minimum_stock ?? 0) ? <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-800">Reponer</span> : Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) === Number(r.minimum_stock ?? 0) ? <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">Stock bajo</span> : <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">Disponible</span> : pretty(r[c])}</td>)}</tr>)}</tbody></table>}</div>}
+    </section><p className="mt-4 text-xs text-slate-500">Reportes consultan ventas, compras y saldos directamente desde Supabase. Ventas y cotizaciones cuentan con formularios conectados a los RPC comerciales; la confirmación de venta descuenta inventario de forma transaccional. Caja y cierres cuentan con su módulo transaccional; la factura fiscal requiere emisor autorizado y validación legal.</p><div className="mt-4 flex flex-wrap gap-4"><a href="/caja" className="inline-block text-sm font-semibold text-orange-700 underline">Abrir caja y cierres</a><a href="/administracion" className="inline-block text-sm font-semibold text-orange-700 underline">Administración y auditoría</a></div></div></div></div></main>
 }
