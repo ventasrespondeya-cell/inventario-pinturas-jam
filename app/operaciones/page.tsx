@@ -39,6 +39,10 @@ export default function OperationsPage() {
   const [productUnit, setProductUnit] = useState('unidad')
   const [productColor, setProductColor] = useState('')
   const [productPrice, setProductPrice] = useState('')
+  const [inventoryWarehouses, setInventoryWarehouses] = useState<Row[]>([])
+  const [minimumWarehouse, setMinimumWarehouse] = useState('')
+  const [minimumProduct, setMinimumProduct] = useState('')
+  const [minimumValue, setMinimumValue] = useState('0')
   const [saleProducts, setSaleProducts] = useState<Row[]>([])
   const [warehouses, setWarehouses] = useState<Row[]>([])
   const [paymentMethods, setPaymentMethods] = useState<Row[]>([])
@@ -133,6 +137,20 @@ export default function OperationsPage() {
   }, [user, section, purchases, catalog, inventory])
 
   useEffect(() => {
+    if (!user || section !== 'Inventario') return
+    let mounted = true
+    inventory.warehouses().then((result) => {
+      if (!mounted) return
+      if (result.ok) {
+        const list = result.data as Row[]
+        setInventoryWarehouses(list)
+        if (!minimumWarehouse && list[0]) setMinimumWarehouse(String(list[0].id))
+      } else setMessage(result.error.message)
+    }).catch((e: unknown) => setMessage(errorText(e)))
+    return () => { mounted = false }
+  }, [user, section, inventory])
+
+  useEffect(() => {
     if (!user || (section !== 'Ventas' && section !== 'Cotizaciones')) return
     let mounted = true
     Promise.all([catalog.listProducts(), inventory.warehouses(), commercial.listCustomers(), commercial.listPaymentMethods()]).then(([p, w, c, m]) => {
@@ -205,6 +223,20 @@ export default function OperationsPage() {
     const refreshed = await catalog.listCategories()
     if (refreshed.ok) setCategories(refreshed.data as Row[])
     setMessage('Categoría guardada correctamente.')
+  }
+
+  async function saveMinimumStock(e: FormEvent) {
+    e.preventDefault()
+    if (!user || !minimumProduct || !minimumWarehouse) {
+      setMessage('Selecciona un producto y un depósito para configurar su stock mínimo.')
+      return
+    }
+    setBusy(true); setMessage('')
+    const result = await inventory.setMinimumStock(minimumProduct, minimumWarehouse, minimumValue, { userId: user.id })
+    setBusy(false)
+    if (!result.ok) { setMessage(result.error.message); return }
+    setMessage('Stock mínimo actualizado correctamente.')
+    await load()
   }
 
   async function createProduct(e: FormEvent) {
@@ -463,6 +495,13 @@ export default function OperationsPage() {
        <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm"><p className="text-xs text-red-800">Agotados</p><p className="mt-2 text-2xl font-bold text-red-700">{inventoryStats.out}</p><p className="mt-1 text-[11px] text-red-700">Sin existencias</p></div>
      </div>}
     {section === 'Inventario' && <>
+       <form onSubmit={saveMinimumStock} className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-4">
+         <div className="md:col-span-4"><h3 className="font-semibold text-slate-800">Configurar stock mínimo</h3><p className="mt-1 text-xs text-slate-600">Se mostrará una alerta cuando la existencia llegue al mínimo o quede por debajo.</p></div>
+         <label className="text-sm">Producto<select required value={minimumProduct} onChange={(e) => setMinimumProduct(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar producto…</option>{rows.map((r) => <option key={String(r.id)} value={String(r.id)}>{String(r.name)}</option>)}</select></label>
+         <label className="text-sm">Depósito<select required value={minimumWarehouse} onChange={(e) => setMinimumWarehouse(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar depósito…</option>{inventoryWarehouses.map((w) => <option key={String(w.id)} value={String(w.id)}>{String(w.name)}</option>)}</select></label>
+         <label className="text-sm">Cantidad mínima<input required min="0" step="0.000001" type="number" value={minimumValue} onChange={(e) => setMinimumValue(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>
+         <button disabled={busy} className="self-end rounded-lg bg-[#172b4d] px-4 py-2 font-semibold text-white disabled:opacity-50">Guardar mínimo</button>
+       </form>
       <form onSubmit={createCategory} className="mt-5 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-4">
         <label className="min-w-0 flex-1 text-sm font-medium">Nueva categoría
           <input required maxLength={80} value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="Ej. Pinturas interiores" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
