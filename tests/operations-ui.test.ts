@@ -118,5 +118,5 @@ test('compras mantiene un formulario simple sin descuentos ni gastos atribuibles
 test('inventario calcula el valor de mercancía en dólares', () => {
   assert.match(route, /valueUsd:/)
   assert.match(route, /Valor de mercancía/)
-  assert.match(route, /Costo promedio en USD/)
+  assert.match(route, /Costo promedio convertido a USD/)
 })
