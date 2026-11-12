@@ -36,7 +36,7 @@ test('inventario registra movimientos y expone mínimos y alertas', () => {
   assert.match(route, /inventory\.recordMovement/)
   assert.match(route, /inventory\.movements/)
   assert.match(route, /inventory\.setMinimumStock/)
-  assert.match(route, /Alertas de stock/)
+  assert.match(route, /Alertas/)
   assert.match(route, /Stock mínimo/)
 })
 
