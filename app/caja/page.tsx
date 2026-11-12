@@ -15,7 +15,7 @@ const dateLabel = (v:string) => { const p=v.split('-'); return p[2]+'/'+p[1]+'/'
 export default function CashPage() {
   const db=useMemo(()=>createClient(),[])
   const router=useRouter()
-  const today=useMemo(()=>localDate(),[])
+  const [today,setToday]=useState('')
   const [ready,setReady]=useState(false)
   const [date,setDate]=useState(today)
   const [cashier,setCashier]=useState('')
@@ -31,6 +31,7 @@ export default function CashPage() {
   const [message,setMessage]=useState('')
 
   const load=useCallback(async()=>{
+    if(!today)return
     const [{data:{user},error:userError},{data,error:listError}]=await Promise.all([db.auth.getUser(),db.rpc('jam_daily_closing_list',{p_limit:40})])
     if(userError||!user){router.replace('/');return}
     if(listError){setError(listError.message);setReady(true);return}
@@ -44,9 +45,10 @@ export default function CashPage() {
       setOpeningFund(String(current.opening_fund??0));setWithdrawals(String(current.withdrawals??0))
       setRows((current.lines?.length?current.lines:[emptyLine()]).map(x=>({...x,id:x.id||crypto.randomUUID()})))
       setNotes(current.notes??'')
-    }
+    } else { setDate(today) }
     setReady(true)
   },[db,router,today])
+  useEffect(()=>{setToday(localDate())},[])
   useEffect(()=>{void load()},[load])
 
   const totals=useMemo(()=>rows.reduce((a,r)=>({mobile:a.mobile+num(r.mobile),pos:a.pos+num(r.pos),cash:a.cash+num(r.cash),usdt:a.usdt+num(r.usdt)}),{mobile:0,pos:0,cash:0,usdt:0}),[rows])
