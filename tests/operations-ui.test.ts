@@ -36,7 +36,7 @@ test('inventario registra movimientos y expone mínimos y alertas', () => {
   assert.match(route, /inventory\.recordMovement/)
   assert.match(route, /inventory\.movements/)
   assert.match(route, /inventory\.setMinimumStock/)
-  assert.match(route, /Alertas de stock/)
+  assert.match(route, /Alertas/)
   assert.match(route, /Stock mínimo/)
 })
 
@@ -44,10 +44,24 @@ test('la consola no expone secretos de Supabase', () => {
   assert.doesNotMatch(route, /process\.env\.[A-Z_]*SERVICE_ROLE/i)
 })
 
-test('el panel inicial dirige al espacio de operaciones', () => {
-  const dashboard = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
-  assert.match(dashboard, /href="\/operaciones"/)
-  assert.doesNotMatch(dashboard, /Clientes|Proveedores/)
+test('la ruta principal entra directamente al mismo sistema, sin un segundo panel de bienvenida', () => {
+  const home = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
+  assert.match(home, /redirect\('\/operaciones'\)/)
+  assert.doesNotMatch(home, /Bienvenido a Pinturas JAM|ENTRAR A OPERACIONES/)
+})
+
+test('la interfaz usa un solo inicio de sesión y una sola navegación', () => {
+  assert.match(route, /Iniciar sesión/)
+  assert.match(route, /Navegación principal/)
+  assert.doesNotMatch(route, /radial-gradient|Acceso autorizado/)
+})
+
+test('inventario separa productos, categorías, mínimos, movimientos y alertas', () => {
+  for (const label of ['Productos', 'Categorías', 'Stock mínimo', 'Movimientos', 'Alertas']) {
+    assert.ok(route.includes(label), `Falta el apartado ${label}`)
+  }
+  assert.match(route, /inventoryView === 'categories'/)
+  assert.match(route, /inventoryView === 'minimum'/)
 })
 
 test('la consola abre la sección indicada por el enlace del dashboard', () => {
