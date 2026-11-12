@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const chat2 = readFileSync(new URL('../supabase/migrations/20261109190000_chat2_pinturas_jam.sql', import.meta.url), 'utf8');
 const chat3 = readFileSync(new URL('../supabase/migrations/20261109200000_chat3_commercial.sql', import.meta.url), 'utf8');
+const catalogArchive = readFileSync(new URL('../supabase/migrations/20261112230500_inventory_catalog_soft_deactivation.sql', import.meta.url), 'utf8');
 
 function functionBody(sql: string, name: string): string {
   const start = sql.indexOf(`function public.${name}(`);
@@ -41,4 +42,15 @@ test('el helper de negocio exige autenticación y restringe EXECUTE a usuarios a
   assert.match(chat3, /if auth\.uid\(\) is null or auth\.uid\(\) <> p_actor then raise exception 'No autorizado'/);
   assert.match(chat3, /revoke all on function public\.jam_commercial_business\(uuid,boolean\) from public,anon/i);
   assert.match(chat3, /grant execute on function public\.jam_commercial_business\(uuid,boolean\) to authenticated/i);
+});
+
+test('el catálogo se archiva sin borrar registros y conserva controles de negocio', () => {
+  assert.match(catalogArchive, /jam_catalog_set_product_active/);
+  assert.match(catalogArchive, /jam_catalog_set_category_active/);
+  assert.match(catalogArchive, /jam_my_business\(p_actor_id, true\)/);
+  assert.match(catalogArchive, /jam_stock_balances/);
+  assert.match(catalogArchive, /No se puede desactivar un producto con existencias/);
+  assert.match(catalogArchive, /No se puede desactivar una categoría que todavía tiene productos activos/);
+  assert.match(catalogArchive, /revoke all on function .* from public, anon/i);
+  assert.match(catalogArchive, /grant execute on function .* to authenticated/i);
 });

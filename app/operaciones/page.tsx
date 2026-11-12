@@ -6,15 +6,15 @@ import type { FormEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { CommercialService } from '@/lib/modules/commercial'
 import { CatalogService, InventoryService } from '@/lib/modules/inventory/supabase'
-import type { ProductInput } from '@/lib/modules/inventory/types'
+import type { MovementInput, ProductInput } from '@/lib/modules/inventory/types'
 import { calculateDocument } from '@/lib/modules/commercial/calculations'
 import type { CommercialLineInput, Currency } from '@/lib/modules/commercial/types'
 import { PurchasesService } from '@/lib/modules/purchases'
 import type { User } from '@supabase/supabase-js'
 
-type Section = 'Inventario' | 'Clientes' | 'Proveedores' | 'Compras' | 'Ventas' | 'Cotizaciones' | 'Cuentas por cobrar' | 'Cuentas por pagar' | 'Reportes'
+type Section = 'Inventario' | 'Compras' | 'Ventas' | 'Cotizaciones' | 'Cuentas por cobrar' | 'Cuentas por pagar' | 'Reportes'
 type Row = Record<string, unknown>
-const sections: Section[] = ['Inventario', 'Clientes', 'Proveedores', 'Compras', 'Ventas', 'Cotizaciones', 'Cuentas por cobrar', 'Cuentas por pagar', 'Reportes']
+const sections: Section[] = ['Inventario', 'Compras', 'Ventas', 'Cotizaciones', 'Cuentas por cobrar', 'Cuentas por pagar', 'Reportes']
 const errorText = (e: unknown) => e instanceof Error ? e.message : 'Ocurrió un error inesperado.'
 const pretty = (v: unknown) => v == null || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v)
 
@@ -29,20 +29,31 @@ export default function OperationsPage() {
   const [search, setSearch] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [customerName, setCustomerName] = useState('')
-  const [customerDocument, setCustomerDocument] = useState('')
-  const [customerPhone, setCustomerPhone] = useState('')
   const [categories, setCategories] = useState<Row[]>([])
   const [selectedCategory, setSelectedCategory] = useState('')
   const [categoryName, setCategoryName] = useState('')
+  const [editingCategoryId, setEditingCategoryId] = useState('')
+  const [showInactive, setShowInactive] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Row | null>(null)
   const [productName, setProductName] = useState('')
   const [productSku, setProductSku] = useState('')
-  const [productBrand, setProductBrand] = useState('')
   const [productCategory, setProductCategory] = useState('')
   const [productPresentation, setProductPresentation] = useState('')
   const [productUnit, setProductUnit] = useState('unidad')
   const [productColor, setProductColor] = useState('')
   const [productPrice, setProductPrice] = useState('')
+  const [inventoryWarehouses, setInventoryWarehouses] = useState<Row[]>([])
+  const [minimumWarehouse, setMinimumWarehouse] = useState('')
+  const [minimumProduct, setMinimumProduct] = useState('')
+  const [minimumValue, setMinimumValue] = useState('0')
+  const [inventoryView, setInventoryView] = useState<'products' | 'movements' | 'alerts'>('products')
+  const [movementRows, setMovementRows] = useState<Row[]>([])
+  const [movementType, setMovementType] = useState<'entry' | 'exit' | 'adjustment'>('entry')
+  const [movementProduct, setMovementProduct] = useState('')
+  const [movementWarehouse, setMovementWarehouse] = useState('')
+  const [movementQuantity, setMovementQuantity] = useState('1')
+  const [movementDelta, setMovementDelta] = useState('')
+  const [movementReason, setMovementReason] = useState('')
   const [saleProducts, setSaleProducts] = useState<Row[]>([])
   const [warehouses, setWarehouses] = useState<Row[]>([])
   const [paymentMethods, setPaymentMethods] = useState<Row[]>([])
@@ -57,9 +68,6 @@ export default function OperationsPage() {
   const [cartPrice, setCartPrice] = useState('')
   const [cart, setCart] = useState<CommercialLineInput[]>([])
   const [customerRows, setCustomerRows] = useState<Row[]>([])
-  const [supplierName, setSupplierName] = useState('')
-  const [supplierTaxId, setSupplierTaxId] = useState('')
-  const [supplierPhone, setSupplierPhone] = useState('')
   const [purchaseSuppliers, setPurchaseSuppliers] = useState<Row[]>([])
   const [purchaseProducts, setPurchaseProducts] = useState<Row[]>([])
   const [purchaseWarehouses, setPurchaseWarehouses] = useState<Row[]>([])
@@ -119,14 +127,14 @@ export default function OperationsPage() {
   useEffect(() => {
     if (!user) return
     let mounted = true
-    catalog.listCategories().then((result) => {
+    catalog.listCategories(true).then((result) => {
       if (mounted && result.ok) setCategories(result.data as Row[])
     })
     return () => { mounted = false }
   }, [user, catalog])
 
   useEffect(() => {
-    if (!user || (section !== 'Compras' && section !== 'Proveedores' && section !== 'Cuentas por pagar')) return
+    if (!user || (section !== 'Compras' && section !== 'Cuentas por pagar')) return
     let mounted = true
     Promise.all([purchases.listSuppliers(), catalog.listProducts(), inventory.warehouses(), purchases.listPayables(), commercial.listPaymentMethods()]).then(([suppliers, products, stockrooms, payables, methods]) => {
       if (!mounted) return
@@ -138,6 +146,31 @@ export default function OperationsPage() {
     }).catch(e => setMessage(errorText(e)))
     return () => { mounted = false }
   }, [user, section, purchases, catalog, inventory])
+
+  useEffect(() => {
+    if (!user || section !== 'Inventario') return
+    let mounted = true
+    inventory.warehouses().then((result) => {
+      if (!mounted) return
+      if (result.ok) {
+        const list = result.data as Row[]
+        setInventoryWarehouses(list)
+        if (!minimumWarehouse && list[0]) setMinimumWarehouse(String(list[0].id))
+      } else setMessage(result.error.message)
+    }).catch((e: unknown) => setMessage(errorText(e)))
+    return () => { mounted = false }
+  }, [user, section, inventory])
+
+  useEffect(() => {
+    if (!user || section !== 'Inventario' || inventoryView !== 'movements') return
+    let mounted = true
+    inventory.movements(undefined, 200).then((result) => {
+      if (!mounted) return
+      if (result.ok) setMovementRows(result.data as Row[])
+      else setMessage(result.error.message)
+    }).catch((e: unknown) => setMessage(errorText(e)))
+    return () => { mounted = false }
+  }, [user, section, inventoryView, inventory])
 
   useEffect(() => {
     if (!user || (section !== 'Ventas' && section !== 'Cotizaciones')) return
@@ -168,15 +201,21 @@ export default function OperationsPage() {
       }
       let result
       if (section === 'Inventario') {
-        const [products, stock] = await Promise.all([catalog.listProducts(search), inventory.stock(search)])
+        const [products, stock] = await Promise.all([catalog.listProducts(search, true), inventory.stock(search)])
         if (!products.ok) throw new Error(products.error.message)
         if (!stock.ok) throw new Error(stock.error.message)
-        const stockByProduct = new Map((stock.data as Row[]).map((r) => [String(r.product_id ?? r.productId), r]))
-        setRows((products.data as Row[]).map((p) => ({ ...p, ...(stockByProduct.get(String(p.id)) ?? {}) })))
+        const stockByProduct = new Map<string, Row>()
+        for (const item of stock.data as Row[]) {
+          const id = String(item.product_id ?? item.productId)
+          const current = stockByProduct.get(id) ?? { quantity: 0, minimum_stock: 0, warehouse_count: 0 }
+          current.quantity = Number(current.quantity ?? 0) + Number(item.quantity ?? 0)
+          current.minimum_stock = Number(current.minimum_stock ?? 0) + Number(item.minimum_stock ?? 0)
+          current.warehouse_count = Number(current.warehouse_count ?? 0) + 1
+          stockByProduct.set(id, current)
+        }
+        setRows((products.data as Row[]).map((p) => ({ ...p, ...(stockByProduct.get(String(p.id)) ?? { quantity: 0, minimum_stock: 0, warehouse_count: 0 }) })))
       } else {
         switch (section) {
-          case 'Clientes': result = await commercial.listCustomers(search); break
-          case 'Proveedores': result = await purchases.listSuppliers(search); break
           case 'Compras': result = await purchases.listPurchases({}); break
           case 'Ventas': result = await commercial.listSales(); break
           case 'Cotizaciones': result = await commercial.listQuotes(); break
@@ -203,38 +242,41 @@ export default function OperationsPage() {
 
   async function signOut() { await db.auth.signOut(); setRows([]); setMessage('Sesión cerrada.') }
 
-  async function createCustomer(e: FormEvent) {
-    e.preventDefault()
-    const name = customerName.trim()
-    if (!name) { setMessage('El nombre del cliente es obligatorio.'); return }
-    setBusy(true); setMessage('')
-    const result = await commercial.saveCustomer({ name, identificationNumber: customerDocument.trim() || null, phone: customerPhone.trim() || null })
-    setBusy(false)
-    if (!result.ok) { setMessage(result.error.message); return }
-    setCustomerName(''); setCustomerDocument(''); setCustomerPhone('')
-    setMessage('Cliente guardado correctamente.'); await load()
-  }
-
   async function createCategory(e: FormEvent) {
     e.preventDefault()
     if (!user) return
     setBusy(true); setMessage('')
-    const result = await catalog.saveCategory(categoryName, { userId: user.id })
+    const result = await catalog.saveCategory(categoryName, { userId: user.id }, editingCategoryId || undefined)
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
-    setCategoryName('')
-    const refreshed = await catalog.listCategories()
+    setCategoryName(''); setEditingCategoryId('')
+    const refreshed = await catalog.listCategories(true)
     if (refreshed.ok) setCategories(refreshed.data as Row[])
     setMessage('Categoría guardada correctamente.')
+  }
+
+  async function saveMinimumStock(e: FormEvent) {
+    e.preventDefault()
+    if (!user || !minimumProduct || !minimumWarehouse) {
+      setMessage('Selecciona un producto y un depósito para configurar su stock mínimo.')
+      return
+    }
+    setBusy(true); setMessage('')
+    const result = await inventory.setMinimumStock(minimumProduct, minimumWarehouse, minimumValue, { userId: user.id })
+    setBusy(false)
+    if (!result.ok) { setMessage(result.error.message); return }
+    setMessage('Stock mínimo actualizado correctamente.')
+    await load()
   }
 
   async function createProduct(e: FormEvent) {
     e.preventDefault()
     if (!user) return
     const input: ProductInput = {
+      ...(editingProduct?.id ? { id: String(editingProduct.id) } : {}),
       name: productName.trim(),
-      sku: productSku.trim() || null,
-      brand: productBrand.trim() || null,
+      sku: null,
+      brand: null,
       categoryId: productCategory || null,
       presentation: productPresentation.trim() || null,
       unit: productUnit,
@@ -245,10 +287,77 @@ export default function OperationsPage() {
     const result = await catalog.saveProduct(input, { userId: user.id })
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
-    setProductName(''); setProductSku(''); setProductBrand(''); setProductPresentation('')
-    setProductColor(''); setProductPrice('')
+    setProductName(''); setProductPresentation(''); setProductCategory(''); setProductUnit('unidad')
+    setProductColor(''); setProductPrice(''); setEditingProduct(null)
     setMessage('Producto guardado correctamente.')
     await load()
+  }
+
+  async function saveInventoryMovement(e: FormEvent) {
+    e.preventDefault()
+    if (!user || !movementProduct || !movementWarehouse) {
+      setMessage('Selecciona el producto y el depósito.')
+      return
+    }
+    const input: MovementInput = {
+      productId: movementProduct,
+      warehouseId: movementWarehouse,
+      type: movementType,
+      quantity: movementQuantity,
+      ...(movementType === 'adjustment' ? { quantityDelta: movementDelta } : {}),
+      reason: movementReason.trim() || undefined,
+      idempotencyKey: crypto.randomUUID(),
+    }
+    setBusy(true); setMessage('')
+    const result = await inventory.recordMovement(input, { userId: user.id })
+    setBusy(false)
+    if (!result.ok) { setMessage(result.error.message); return }
+    setMovementQuantity('1'); setMovementDelta(''); setMovementReason('')
+    setMessage('Movimiento de inventario registrado correctamente.')
+    const [history] = await Promise.all([inventory.movements(undefined, 200), load()])
+    if (history.ok) setMovementRows(history.data as Row[])
+  }
+
+  function beginEditProduct(product: Row) {
+    setEditingProduct(product)
+    setProductName(String(product.name ?? ''))
+    setProductCategory(String(product.category_id ?? ''))
+    setProductPresentation(String(product.presentation ?? ''))
+    setProductUnit(String(product.unit ?? 'unidad'))
+    setProductColor(String(product.color ?? ''))
+    setProductPrice(String(product.sale_price ?? ''))
+    setMessage('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function toggleProductActive(product: Row) {
+    if (!user) return
+    const active = product.active !== false
+    const prompt = active
+      ? '¿Desactivar este producto? Se conservarán sus documentos y movimientos históricos. No podrá desactivarse si tiene existencias.'
+      : '¿Reactivar este producto?'
+    if (!window.confirm(prompt)) return
+    setBusy(true); setMessage('')
+    const result = await catalog.setProductActive(String(product.id), !active, { userId: user.id })
+    setBusy(false)
+    if (!result.ok) { setMessage(result.error.message); return }
+    setMessage(active ? 'Producto desactivado; el historial se conservó.' : 'Producto reactivado.')
+    await load()
+  }
+
+  async function toggleCategoryActive(category: Row) {
+    if (!user) return
+    const active = category.active !== false
+    if (!window.confirm(active
+      ? '¿Desactivar esta categoría? Primero reasigna o desactiva sus productos activos.'
+      : '¿Reactivar esta categoría?')) return
+    setBusy(true); setMessage('')
+    const result = await catalog.setCategoryActive(String(category.id), !active, { userId: user.id })
+    setBusy(false)
+    if (!result.ok) { setMessage(result.error.message); return }
+    const refreshed = await catalog.listCategories(true)
+    if (refreshed.ok) setCategories(refreshed.data as Row[])
+    setMessage(active ? 'Categoría desactivada.' : 'Categoría reactivada.')
   }
 
   function addCartLine(e: FormEvent) {
@@ -285,19 +394,6 @@ export default function OperationsPage() {
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
     setCart([]); setSaleNotes(''); setSalePaymentAmount(''); setMessage('Venta confirmada. Se registró el movimiento de inventario y los cobros informados.'); await load()
-  }
-
-  async function createSupplier(e: FormEvent) {
-    e.preventDefault()
-    if (!supplierName.trim()) { setMessage('El nombre del proveedor es obligatorio.'); return }
-    setBusy(true); setMessage('')
-    const result = await purchases.saveSupplier({ name: supplierName.trim(), taxId: supplierTaxId.trim() || null, phone: supplierPhone.trim() || null, active: true })
-    setBusy(false)
-    if (!result.ok) { setMessage(result.error.message); return }
-    setSupplierName(''); setSupplierTaxId(''); setSupplierPhone('')
-    setMessage('Proveedor guardado correctamente.')
-    const refreshed = await purchases.listSuppliers()
-    if (refreshed.ok) { setPurchaseSuppliers(refreshed.data as unknown as Row[]); await load() }
   }
 
   function addPurchaseLine(e: FormEvent) {
@@ -368,9 +464,7 @@ export default function OperationsPage() {
 
   const columns = useMemo(() => {
     const preferred: Record<Section, string[]> = {
-      Inventario: ['sku','name','presentation','unit','quantity','average_cost_ves','minimum_stock','sale_price','active'],
-      Clientes: ['name','identification_type','identification_number','tax_id','phone','email','credit_enabled','active'],
-      Proveedores: ['name','tax_id','phone','email','active'],
+      Inventario: ['name','category_id','presentation','color','sale_price','quantity','minimum_stock','stock_status','actions'],
       Compras: ['document_number','document_date','currency','status','total','created_at'],
       Ventas: ['sale_number','sale_date','currency','status','total','created_at'],
       Cotizaciones: ['quote_number','quote_date','currency','status','total','valid_until'],
@@ -379,13 +473,17 @@ export default function OperationsPage() {
       Reportes: [],
     }
     const keys = new Set(rows.flatMap((r) => Object.keys(r)))
-    const selected = preferred[section].filter((k) => keys.has(k))
+    const selected = preferred[section].filter((k) => k === 'stock_status' || k === 'actions' || keys.has(k))
     return selected.length ? selected : [...keys].slice(0, 7)
   }, [rows, section])
 
+  const inventoryRows = useMemo(() => rows.filter((r) => showInactive || r.active !== false), [rows, showInactive])
+  const inventoryStats = useMemo(() => ({ total: inventoryRows.length, units: inventoryRows.reduce((sum, r) => sum + Number(r.quantity ?? 0), 0), low: inventoryRows.filter((r) => r.active !== false && Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0)).length, out: inventoryRows.filter((r) => r.active !== false && Number(r.quantity ?? 0) <= 0).length }), [inventoryRows])
+
   const visibleRows = useMemo(() => section === 'Inventario' && selectedCategory
-    ? rows.filter((r) => String(r.category_id ?? '') === selectedCategory)
-    : rows, [rows, section, selectedCategory])
+    ? inventoryRows.filter((r) => String(r.category_id ?? '') === selectedCategory)
+    : section === 'Inventario' && inventoryView === 'alerts' ? inventoryRows.filter((r) => r.active !== false && (Number(r.quantity ?? 0) <= 0 || (Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0))))
+    : section === 'Inventario' ? inventoryRows : rows, [rows, section, selectedCategory, inventoryRows, inventoryView])
 
   if (!ready) return <main className="min-h-screen bg-slate-50 p-8 text-slate-700">Cargando sesión segura…</main>
 
@@ -475,29 +573,74 @@ export default function OperationsPage() {
     </main>
   )
 
-  return <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 md:px-8"><div className="mx-auto max-w-7xl"><header className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-bold tracking-[.2em] text-orange-600">PINTURAS JAM · OPERACIONES</p><h1 className="mt-1 text-2xl font-bold">Centro de datos comerciales</h1><p className="mt-1 text-sm text-slate-600">Sesión: {user.email ?? user.id}</p></div><div className="flex gap-2"><button onClick={() => void load()} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">Actualizar</button><button onClick={() => void signOut()} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Cerrar sesión</button></div></header>
-    {notice && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{notice}</p>}\n    <div className="mt-6 flex flex-wrap gap-2">{sections.map((s) => <button key={s} onClick={() => { setSection(s); setSearch(''); setSelectedCategory('') }} className={`rounded-full px-4 py-2 text-sm font-semibold ${section === s ? 'bg-orange-600 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}>{s}</button>)}</div>
+  return <main className="min-h-screen bg-[#f4f6fa] text-slate-900"><div className="mx-auto flex min-h-screen max-w-[1600px] flex-col md:flex-row">
+    <aside className="w-full shrink-0 bg-[#172b4d] px-4 py-4 text-white md:w-60 md:px-5 md:py-7">
+      <div className="px-2 pb-4 md:pb-9"><p className="text-2xl font-black tracking-wide">JAM</p><p className="mt-1 text-[10px] font-semibold tracking-[0.32em] text-blue-200">PINTURAS</p></div>
+      <p className="mb-2 hidden px-2 text-[10px] font-bold tracking-[0.18em] text-blue-200 md:block">MENÚ PRINCIPAL</p>
+      <nav className="flex flex-wrap gap-1 md:flex-col">{sections.map((s) => <button key={s} onClick={() => { setSection(s); setSearch(''); setSelectedCategory('') }} className={`rounded-lg px-3 py-3 text-left text-sm font-semibold transition ${section === s ? 'bg-[#2e4770] text-white shadow-inner' : 'text-blue-100 hover:bg-white/10'}`}>{s === 'Inventario' ? '▦  ' : s === 'Compras' ? '＋  ' : s === 'Ventas' ? '↗  ' : s === 'Cotizaciones' ? '▤  ' : s === 'Reportes' ? '▥  ' : '$  '}{s}</button>)}</nav>
+      <div className="mt-8 hidden border-t border-white/10 px-2 pt-4 text-xs text-blue-200 md:block">Gestión comercial JAM</div>
+    </aside>
+    <div className="min-w-0 flex-1">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 md:px-8">
+        <div><p className="text-xs font-bold tracking-[.18em] text-orange-600">PINTURAS JAM · OPERACIONES</p><h1 className="mt-1 text-2xl font-bold">{section}</h1><p className="mt-1 text-xs text-slate-500">Sesión: {user.email ?? user.id}</p></div>
+        <div className="flex gap-2"><button onClick={() => void load()} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">Actualizar</button><button onClick={() => void signOut()} className="rounded-lg bg-[#172b4d] px-4 py-2 text-sm font-semibold text-white">Cerrar sesión</button></div>
+      </header>
+      <div className="p-4 md:p-8">
+      {notice && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{notice}</p>}
     <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">{section}</h2><p className="text-sm text-slate-500">Datos leídos desde las tablas/RPC del proyecto Supabase autenticado.</p></div><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Buscar ${section.toLowerCase()}…`} className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm" /></div>
-    {section === 'Inventario' && <>
+     {section === 'Inventario' && <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Total de productos</p><p className="mt-2 text-2xl font-bold">{inventoryStats.total}</p><p className="mt-1 text-[11px] text-slate-400">Productos registrados</p></div>
+       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Unidades disponibles</p><p className="mt-2 text-2xl font-bold">{inventoryStats.units.toLocaleString('es-VE')}</p><p className="mt-1 text-[11px] text-slate-400">Existencia total</p></div>
+       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm"><p className="text-xs text-amber-800">Stock bajo</p><p className="mt-2 text-2xl font-bold text-amber-700">{inventoryStats.low}</p><p className="mt-1 text-[11px] text-amber-700">En el mínimo o por debajo</p></div>
+       <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm"><p className="text-xs text-red-800">Agotados</p><p className="mt-2 text-2xl font-bold text-red-700">{inventoryStats.out}</p><p className="mt-1 text-[11px] text-red-700">Sin existencias</p></div>
+     </div>}
+    {section === 'Inventario' && <div className="mb-4 flex flex-wrap gap-2">
+       <button type="button" onClick={() => setInventoryView('products')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${inventoryView === 'products' ? 'bg-[#172b4d] text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>Productos</button>
+       <button type="button" onClick={() => setInventoryView('movements')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${inventoryView === 'movements' ? 'bg-[#172b4d] text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>Movimientos</button>
+       <button type="button" onClick={() => setInventoryView('alerts')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${inventoryView === 'alerts' ? 'bg-[#172b4d] text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>Alertas de stock</button>
+     </div>}
+    {section === 'Inventario' && inventoryView === 'products' && <>
+       <form onSubmit={saveMinimumStock} className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-4">
+         <div className="md:col-span-4"><h3 className="font-semibold text-slate-800">Configurar stock mínimo</h3><p className="mt-1 text-xs text-slate-600">Se mostrará una alerta cuando la existencia llegue al mínimo o quede por debajo.</p></div>
+         <label className="text-sm">Producto<select required value={minimumProduct} onChange={(e) => setMinimumProduct(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar producto…</option>{rows.map((r) => <option key={String(r.id)} value={String(r.id)}>{String(r.name)}</option>)}</select></label>
+         <label className="text-sm">Depósito<select required value={minimumWarehouse} onChange={(e) => setMinimumWarehouse(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar depósito…</option>{inventoryWarehouses.map((w) => <option key={String(w.id)} value={String(w.id)}>{String(w.name)}</option>)}</select></label>
+         <label className="text-sm">Cantidad mínima<input required min="0" step="0.000001" type="number" value={minimumValue} onChange={(e) => setMinimumValue(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>
+         <button disabled={busy} className="self-end rounded-lg bg-[#172b4d] px-4 py-2 font-semibold text-white disabled:opacity-50">Guardar mínimo</button>
+       </form>
       <form onSubmit={createCategory} className="mt-5 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-4">
+         <div className="w-full text-sm font-semibold">{editingCategoryId ? "Editar categoría" : "Administrar categorías"}</div>
         <label className="min-w-0 flex-1 text-sm font-medium">Nueva categoría
           <input required maxLength={80} value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="Ej. Pinturas interiores" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
         </label>
-        <button disabled={busy} className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-semibold disabled:opacity-50">Guardar categoría</button>
+        <button disabled={busy} className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-semibold disabled:opacity-50">{editingCategoryId ? "Guardar cambios" : "Crear categoría"}</button>{editingCategoryId && <button type="button" onClick={() => { setEditingCategoryId(""); setCategoryName("") }} className="rounded-lg border border-slate-300 bg-white px-4 py-2">Cancelar</button>}
       </form>
       <form onSubmit={createProduct} className="mt-3 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-4">
+         <div className="md:col-span-4 text-sm font-semibold">{editingProduct ? "Editar producto" : "Agregar producto"}</div>
         <label className="text-sm">Nombre del producto *<input required value={productName} onChange={(e) => setProductName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
-        <label className="text-sm">Código / SKU<input value={productSku} onChange={(e) => setProductSku(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
-        <label className="text-sm">Marca<input value={productBrand} onChange={(e) => setProductBrand(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
-        <label className="text-sm">Categoría<select value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Sin categoría</option>{categories.map((c) => <option key={String(c.id)} value={String(c.id)}>{String(c.name)}</option>)}</select></label>
+        <label className="text-sm">Categoría<select value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Sin categoría</option>{categories.filter((c) => c.active !== false).map((c) => <option key={String(c.id)} value={String(c.id)}>{String(c.name)}</option>)}</select></label>
         <label className="text-sm">Presentación<input value={productPresentation} onChange={(e) => setProductPresentation(e.target.value)} placeholder="Galón, cuñete…" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <label className="text-sm">Unidad<select value={productUnit} onChange={(e) => setProductUnit(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="unidad">Unidad</option><option value="galón">Galón</option><option value="cuñete">Cuñete</option><option value="litro">Litro</option><option value="kilogramo">Kilogramo</option></select></label>
         <label className="text-sm">Color<input value={productColor} onChange={(e) => setProductColor(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <label className="text-sm">Precio de venta<input inputMode="decimal" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} placeholder="Ej. 12.50" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
-        <button disabled={busy} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50 md:col-span-4">Guardar producto en catálogo</button>
+        <div className="flex flex-wrap gap-2 md:col-span-4"><button disabled={busy} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{editingProduct ? "Guardar cambios" : "Guardar producto"}</button>{editingProduct && <button type="button" onClick={() => { setEditingProduct(null); setProductName(""); setProductCategory(""); setProductPresentation(""); setProductColor(""); setProductPrice("") }} className="rounded-lg border border-slate-300 px-4 py-2">Cancelar edición</button>}</div>
       </form>
-      <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => setSelectedCategory('')} className="rounded-full border px-3 py-1 text-xs">Todas las categorías</button>{categories.map((c) => <button key={String(c.id)} onClick={() => setSelectedCategory(String(c.id))} className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs text-orange-800">{String(c.name)}</button>)}</div>
+      <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => setSelectedCategory('')} className="rounded-full border px-3 py-1 text-xs">Todas las categorías</button>{categories.filter((c) => c.active !== false).map((c) => <button key={String(c.id)} onClick={() => setSelectedCategory(String(c.id))} className={`rounded-full border px-3 py-1 text-xs ${selectedCategory === String(c.id) ? 'border-orange-400 bg-orange-100 text-orange-900' : 'border-slate-200 bg-white text-slate-700'}`}>{String(c.name)}</button>)}</div>
+       <div className="mt-3 rounded-xl border border-slate-200 p-3"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Editar o desactivar categorías</p><div className="flex flex-wrap gap-2">{categories.map((c) => <div key={String(c.id)} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="font-semibold">{String(c.name)}</span>{c.active === false && <span className="text-amber-700">Inactiva</span>}<button type="button" onClick={() => { setEditingCategoryId(String(c.id)); setCategoryName(String(c.name)) }} className="font-semibold text-blue-700 underline">Editar</button><button type="button" onClick={() => void toggleCategoryActive(c)} disabled={busy} className="font-semibold text-red-700 underline">{c.active === false ? "Reactivar" : "Desactivar"}</button></div>)}</div></div>
+       <label className="mt-3 inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> Mostrar productos desactivados</label>
     </>}
+    {section === 'Inventario' && inventoryView === 'movements' && <div className="mt-4 space-y-4">
+       <form onSubmit={saveInventoryMovement} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-5">
+         <div className="md:col-span-5"><h3 className="font-semibold">Registrar movimiento</h3><p className="text-xs text-slate-500">Cada entrada, salida o ajuste queda guardado en el historial.</p></div>
+         <label className="text-sm">Tipo<select value={movementType} onChange={(e) => setMovementType(e.target.value as 'entry' | 'exit' | 'adjustment')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="entry">Entrada</option><option value="exit">Salida</option><option value="adjustment">Ajuste</option></select></label>
+         <label className="text-sm md:col-span-2">Producto<select required value={movementProduct} onChange={(e) => setMovementProduct(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{rows.filter((r) => r.active !== false).map((r) => <option key={String(r.id)} value={String(r.id)}>{String(r.name)}</option>)}</select></label>
+         <label className="text-sm md:col-span-2">Depósito<select required value={movementWarehouse} onChange={(e) => setMovementWarehouse(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{inventoryWarehouses.map((w) => <option key={String(w.id)} value={String(w.id)}>{String(w.name)}</option>)}</select></label>
+         <label className="text-sm">Cantidad<input required type="number" min="0.000001" step="0.000001" value={movementQuantity} onChange={(e) => setMovementQuantity(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>
+         {movementType === 'adjustment' && <label className="text-sm">Diferencia (+/-)<input required type="number" step="0.000001" value={movementDelta} onChange={(e) => setMovementDelta(e.target.value)} placeholder="Ej. -2 o 5" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>}
+         <label className="text-sm md:col-span-2">Motivo / referencia<input required={movementType === 'adjustment'} value={movementReason} onChange={(e) => setMovementReason(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>
+         <button disabled={busy} className="self-end rounded-lg bg-[#172b4d] px-4 py-2 font-semibold text-white disabled:opacity-50">Guardar movimiento</button>
+       </form>
+       <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[760px] text-sm"><thead className="bg-slate-50"><tr>{['Fecha','Producto','Depósito','Tipo','Cantidad','Saldo','Motivo'].map((h) => <th key={h} className="p-3 text-left text-xs font-bold uppercase text-slate-500">{h}</th>)}</tr></thead><tbody>{movementRows.map((m) => <tr key={String(m.id)} className="border-t border-slate-100"><td className="p-3">{m.created_at ? new Date(String(m.created_at)).toLocaleString('es-VE') : '—'}</td><td className="p-3">{String(rows.find((r) => String(r.id) === String(m.product_id))?.name ?? m.product_id)}</td><td className="p-3">{String(inventoryWarehouses.find((w) => String(w.id) === String(m.warehouse_id))?.name ?? m.warehouse_id)}</td><td className="p-3">{m.movement_type === 'entry' ? 'Entrada' : m.movement_type === 'exit' ? 'Salida' : m.movement_type === 'adjustment' ? 'Ajuste' : String(m.movement_type)}</td><td className="p-3">{String(m.quantity_delta)}</td><td className="p-3">{String(m.balance_after)}</td><td className="p-3">{String(m.reason ?? '—')}</td></tr>)}</tbody></table>{movementRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">Todavía no hay movimientos registrados.</p>}</div>
+     </div>}
     {(section === 'Ventas' || section === 'Cotizaciones') && <div className="mt-5 space-y-4">
       <form onSubmit={addCartLine} className="grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4">
         <label className="text-sm md:col-span-2">Producto<select required value={cartProduct} onChange={e => { setCartProduct(e.target.value); const p=saleProducts.find(x=>String(x.id)===e.target.value); setCartPrice(p ? String(p.sale_price ?? '') : '') }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar producto…</option>{saleProducts.map(p=><option key={String(p.id)} value={String(p.id)}>{String(p.name)} · {String(p.sku ?? 'Sin código')}</option>)}</select></label>
@@ -516,7 +659,6 @@ export default function OperationsPage() {
       <div className="flex flex-wrap gap-2">{section === 'Cotizaciones' ? <button onClick={saveQuote} disabled={busy || !cart.length} className="rounded-lg bg-orange-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50">Guardar cotización</button> : <button onClick={confirmSale} disabled={busy || !cart.length} className="rounded-lg bg-orange-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50">Confirmar venta y descontar inventario</button>}<button type="button" onClick={()=>setCart([])} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-semibold">Vaciar operación</button></div>
       <p className="text-xs text-slate-500">Los documentos se guardan en Supabase. La venta confirmada valida existencias y registra la salida de inventario en una transacción. Los descuentos y la emisión fiscal requieren sus permisos y configuración correspondientes.</p>
     </div>}
-    {section === 'Proveedores' && <form onSubmit={createSupplier} className="mt-5 grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4"><label className="text-sm">Razón social / nombre *<input required value={supplierName} onChange={e=>setSupplierName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">RIF / identificación<input value={supplierTaxId} onChange={e=>setSupplierTaxId(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Teléfono<input value={supplierPhone} onChange={e=>setSupplierPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><button disabled={busy} className="self-end rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white">Guardar proveedor</button></form>}
     {section === 'Compras' && <div className="mt-5 space-y-4">
       <div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Registrar compra / orden de mercancía</h2><div className="mt-3 grid gap-3 md:grid-cols-4"><label className="text-sm">Proveedor<select value={purchaseSupplier} onChange={e=>setPurchaseSupplier(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{purchaseSuppliers.map(x=><option key={String(x.id)} value={String(x.id)}>{String(x.name)}</option>)}</select></label><label className="text-sm">N.º documento<input value={purchaseDocument} onChange={e=>setPurchaseDocument(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Fecha<input type="date" value={purchaseDate} onChange={e=>setPurchaseDate(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Moneda<select value={purchaseCurrency} onChange={e=>setPurchaseCurrency(e.target.value as Currency)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="VES">VES</option><option value="USD">USD</option></select></label></div>
       <form onSubmit={addPurchaseLine} className="mt-4 grid gap-3 rounded-lg bg-slate-50 p-3 md:grid-cols-6"><label className="text-sm md:col-span-2">Producto<select required value={purchaseProduct} onChange={e=>setPurchaseProduct(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{purchaseProducts.map(x=><option key={String(x.id)} value={String(x.id)}>{String(x.name)} · {String(x.sku ?? 'Sin código')}</option>)}</select></label><label className="text-sm">Cantidad<input value={purchaseQuantity} onChange={e=>setPurchaseQuantity(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Costo unitario<input value={purchaseUnitCost} onChange={e=>setPurchaseUnitCost(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Descuento total<input value={purchaseDiscount} onChange={e=>setPurchaseDiscount(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Gastos atribuibles<input value={purchaseExpense} onChange={e=>setPurchaseExpense(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><button className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold md:col-span-6">Agregar línea</button></form>
@@ -527,8 +669,7 @@ export default function OperationsPage() {
     </div>}
     {section === 'Cuentas por pagar' && <div className="mt-5 rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Registrar pago a proveedor</h2><div className="mt-3 grid gap-3 md:grid-cols-4"><label className="text-sm md:col-span-2">Cuenta pendiente<select value={selectedPayable} onChange={e=>{setSelectedPayable(e.target.value);setSupplierPayAmount('')}} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar cuenta…</option>{payableRows.filter(x=>String(x.status)!=='paid').map(x=><option key={String(x.id)} value={String(x.id)}>{String(x.supplier_id)} · {String(x.balance ?? x.original_amount)} {String(x.currency)} · {String(x.status)}</option>)}</select></label><label className="text-sm">Importe<input value={supplierPayAmount} onChange={e=>setSupplierPayAmount(e.target.value)} inputMode="decimal" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Método<select value={supplierPayMethod} onChange={e=>setSupplierPayMethod(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{supplierPaymentMethods.map(m=><option key={String(m.id)} value={String(m.name)}>{String(m.name)}</option>)}</select></label><label className="text-sm md:col-span-3">Referencia<input value={supplierPayReference} onChange={e=>setSupplierPayReference(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={registerSupplierPayment} disabled={busy || !selectedPayable} className="self-end rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white">Registrar pago</button></div><p className="mt-3 text-xs text-slate-500">El pago respeta moneda, saldo y método autorizado. En cuentas USD, la base exige tasa BCV para la fecha del pago. El movimiento de caja queda en cola para el consumidor de Chat 4.</p></div>}
     {section === 'Reportes' && <div className="mt-5 space-y-5"><div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 p-4"><label className="text-sm">Desde<input type="date" value={reportFrom} onChange={e=>setReportFrom(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm">Hasta<input type="date" value={reportTo} onChange={e=>setReportTo(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><button onClick={()=>void load()} disabled={busy || reportFrom>reportTo} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Generar reporte</button></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[{label:'Ventas registradas',value:String(reportSales.length)},{label:'Compras registradas',value:String(reportPurchases.length)},{label:'Cuentas por cobrar',value:String(reportReceivables.length)},{label:'Cuentas por pagar',value:String(reportPayables.length)}].map(x=><div key={x.label} className="rounded-xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">{x.label}</p><p className="mt-2 text-3xl font-bold">{x.value}</p></div>)}</div><div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Eventos comerciales pendientes de sincronizar: {reportCashPending}.</strong><p className="mt-1">Son cobros y pagos aún no importados a un turno de caja de la misma moneda. Abre caja y ejecuta la sincronización para incorporarlos al arqueo.</p></div><div className="grid gap-4 lg:grid-cols-2"><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Ventas del período</h2><p className="mt-1 text-xs text-slate-500">Listado real desde Supabase; importes separados por moneda.</p><div className="mt-3 space-y-2">{reportSales.length?reportSales.map((r,i)=><div key={String(r.id??i)} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{String(r.sale_number??r.id??'Venta')} · {String(r.sale_date??'')}</span><strong>{String(r.total??'—')} {String(r.currency??'')}</strong></div>):<p className="text-sm text-slate-500">Sin ventas en el período.</p>}</div></div><div className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Compras del período</h2><p className="mt-1 text-xs text-slate-500">Listado real desde Supabase; importes separados por moneda.</p><div className="mt-3 space-y-2">{reportPurchases.length?reportPurchases.map((r,i)=><div key={String(r.id??i)} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{String(r.document_number??r.id??'Compra')} · {String(r.document_date??'')}</span><strong>{String(r.total??'—')} {String(r.currency??'')}</strong></div>):<p className="text-sm text-slate-500">Sin compras en el período.</p>}</div></div></div></div>}
-    {section === 'Clientes' && <form onSubmit={createCustomer} className="mt-5 grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4"><label className="text-sm">Nombre *<input required value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Documento<input value={customerDocument} onChange={(e) => setCustomerDocument(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><label className="text-sm">Teléfono<input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label><button disabled={busy} className="self-end rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Guardar cliente</button></form>}
     {message && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{message}</p>}
-    <div className="mt-5 overflow-x-auto">{busy ? <p className="p-8 text-center text-sm text-slate-500">Consultando…</p> : visibleRows.length === 0 ? <div className="p-10 text-center"><p className="font-semibold">No hay registros para mostrar</p><p className="mt-1 text-sm text-slate-500">Puede que aún no existan datos, que falte aplicar la migración correspondiente o que tu usuario no tenga acceso al negocio.</p></div> : <table className="w-full min-w-[640px] border-collapse text-left text-sm"><thead><tr>{columns.map((c) => <th key={c} className="border-b border-slate-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{visibleRows.map((r,i) => <tr key={String(r.id ?? i)} onClick={section === 'Compras' ? () => void openPurchase(String(r.id)) : undefined} className={`odd:bg-slate-50 ${section === 'Compras' ? 'cursor-pointer hover:bg-orange-50' : ''}`}>{columns.map((c) => <td key={c} className="max-w-xs border-b border-slate-100 px-3 py-3 text-slate-700">{c === 'category_id' ? String(categories.find((cat) => String(cat.id) === String(r[c]))?.name ?? 'Sin categoría') : pretty(r[c])}</td>)}</tr>)}</tbody></table>}</div>
-    </section><p className="mt-4 text-xs text-slate-500">Reportes consultan ventas, compras y saldos directamente desde Supabase. Ventas y cotizaciones cuentan con formularios conectados a los RPC comerciales; la confirmación de venta descuenta inventario de forma transaccional. Caja y cierres cuentan con su módulo transaccional; la factura fiscal requiere emisor autorizado y validación legal.</p><div className="mt-4 flex flex-wrap gap-4"><a href="/caja" className="inline-block text-sm font-semibold text-orange-700 underline">Abrir caja y cierres</a><a href="/administracion" className="inline-block text-sm font-semibold text-orange-700 underline">Administración y auditoría</a><a href="/" className="inline-block text-sm text-orange-700 underline">Volver al panel visual</a></div></div></main>
+    {!(section === 'Inventario' && inventoryView === 'movements') && <div className="mt-5 overflow-x-auto">{busy ? <p className="p-8 text-center text-sm text-slate-500">Consultando…</p> : visibleRows.length === 0 ? <div className="p-10 text-center"><p className="font-semibold">No hay registros para mostrar</p><p className="mt-1 text-sm text-slate-500">Puede que aún no existan datos, que falte aplicar la migración correspondiente o que tu usuario no tenga acceso al negocio.</p></div> : <table className="w-full min-w-[640px] border-collapse text-left text-sm"><thead><tr>{columns.map((c) => <th key={c} className="border-b border-slate-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{({name:'Producto',category_id:'Categoría',presentation:'Presentación',color:'Color',sale_price:'Precio',quantity:'Existencia',minimum_stock:'Stock mínimo',stock_status:'Estado',actions:'Acciones'} as Record<string,string>)[c] ?? c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{visibleRows.map((r,i) => <tr key={String(r.id ?? i)} onClick={section === 'Compras' ? () => void openPurchase(String(r.id)) : undefined} className={`odd:bg-slate-50 ${section === 'Compras' ? 'cursor-pointer hover:bg-orange-50' : ''}`}>{columns.map((c) => <td key={c} className="max-w-xs border-b border-slate-100 px-3 py-3 text-slate-700">{c === 'actions' && section === 'Inventario' ? <div className="flex min-w-36 flex-wrap gap-2"><button type="button" onClick={(e) => { e.stopPropagation(); beginEditProduct(r) }} className="font-semibold text-blue-700 underline">Editar</button><button type="button" onClick={(e) => { e.stopPropagation(); void toggleProductActive(r) }} disabled={busy} className="font-semibold text-red-700 underline">{r.active === false ? "Reactivar" : "Desactivar"}</button></div> : c === 'category_id' ? String(categories.find((cat) => String(cat.id) === String(r[c]))?.name ?? 'Sin categoría') : c === 'stock_status' ? Number(r.quantity ?? 0) <= 0 ? <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700">Agotado</span> : Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) < Number(r.minimum_stock ?? 0) ? <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-800">Reponer</span> : Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) === Number(r.minimum_stock ?? 0) ? <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">Stock bajo</span> : <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">Disponible</span> : pretty(r[c])}</td>)}</tr>)}</tbody></table>}</div>}
+    </section><p className="mt-4 text-xs text-slate-500">Reportes consultan ventas, compras y saldos directamente desde Supabase. Ventas y cotizaciones cuentan con formularios conectados a los RPC comerciales; la confirmación de venta descuenta inventario de forma transaccional. Caja y cierres cuentan con su módulo transaccional; la factura fiscal requiere emisor autorizado y validación legal.</p><div className="mt-4 flex flex-wrap gap-4"><a href="/caja" className="inline-block text-sm font-semibold text-orange-700 underline">Abrir caja y cierres</a><a href="/administracion" className="inline-block text-sm font-semibold text-orange-700 underline">Administración y auditoría</a><a href="/" className="inline-block text-sm text-orange-700 underline">Volver al panel visual</a></div></div></div></div></main>
 }
