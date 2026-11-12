@@ -38,7 +38,7 @@ export default function HomePage() {
 
         <div className="relative mx-auto aspect-square w-full max-w-[min(76vw,470px)] overflow-hidden rounded-full bg-white shadow-[0_28px_90px_-35px_rgba(15,35,80,0.42)] ring-8 ring-white/80">
           <Image
-            src="/logo-pinturas-jam.jpg"
+            src="/pinturas-jam-logo.jpg"
             alt="Pinturas JAM — Excelencia en pinturas"
             fill
             priority
