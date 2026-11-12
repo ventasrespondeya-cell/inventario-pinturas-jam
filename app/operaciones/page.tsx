@@ -6,7 +6,7 @@ import type { FormEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { CommercialService } from '@/lib/modules/commercial'
 import { CatalogService, InventoryService } from '@/lib/modules/inventory/supabase'
-import type { ProductInput } from '@/lib/modules/inventory/types'
+import type { MovementInput, ProductInput } from '@/lib/modules/inventory/types'
 import { calculateDocument } from '@/lib/modules/commercial/calculations'
 import type { CommercialLineInput, Currency } from '@/lib/modules/commercial/types'
 import { PurchasesService } from '@/lib/modules/purchases'
@@ -46,6 +46,14 @@ export default function OperationsPage() {
   const [minimumWarehouse, setMinimumWarehouse] = useState('')
   const [minimumProduct, setMinimumProduct] = useState('')
   const [minimumValue, setMinimumValue] = useState('0')
+  const [inventoryView, setInventoryView] = useState<'products' | 'movements' | 'alerts'>('products')
+  const [movementRows, setMovementRows] = useState<Row[]>([])
+  const [movementType, setMovementType] = useState<'entry' | 'exit' | 'adjustment'>('entry')
+  const [movementProduct, setMovementProduct] = useState('')
+  const [movementWarehouse, setMovementWarehouse] = useState('')
+  const [movementQuantity, setMovementQuantity] = useState('1')
+  const [movementDelta, setMovementDelta] = useState('')
+  const [movementReason, setMovementReason] = useState('')
   const [saleProducts, setSaleProducts] = useState<Row[]>([])
   const [warehouses, setWarehouses] = useState<Row[]>([])
   const [paymentMethods, setPaymentMethods] = useState<Row[]>([])
@@ -152,6 +160,17 @@ export default function OperationsPage() {
     }).catch((e: unknown) => setMessage(errorText(e)))
     return () => { mounted = false }
   }, [user, section, inventory])
+
+  useEffect(() => {
+    if (!user || section !== 'Inventario' || inventoryView !== 'movements') return
+    let mounted = true
+    inventory.movements(undefined, 200).then((result) => {
+      if (!mounted) return
+      if (result.ok) setMovementRows(result.data as Row[])
+      else setMessage(result.error.message)
+    }).catch((e: unknown) => setMessage(errorText(e)))
+    return () => { mounted = false }
+  }, [user, section, inventoryView, inventory])
 
   useEffect(() => {
     if (!user || (section !== 'Ventas' && section !== 'Cotizaciones')) return
@@ -272,6 +291,31 @@ export default function OperationsPage() {
     setProductColor(''); setProductPrice(''); setEditingProduct(null)
     setMessage('Producto guardado correctamente.')
     await load()
+  }
+
+  async function saveInventoryMovement(e: FormEvent) {
+    e.preventDefault()
+    if (!user || !movementProduct || !movementWarehouse) {
+      setMessage('Selecciona el producto y el depósito.')
+      return
+    }
+    const input: MovementInput = {
+      productId: movementProduct,
+      warehouseId: movementWarehouse,
+      type: movementType,
+      quantity: movementQuantity,
+      ...(movementType === 'adjustment' ? { quantityDelta: movementDelta } : {}),
+      reason: movementReason.trim() || undefined,
+      idempotencyKey: crypto.randomUUID(),
+    }
+    setBusy(true); setMessage('')
+    const result = await inventory.recordMovement(input, { userId: user.id })
+    setBusy(false)
+    if (!result.ok) { setMessage(result.error.message); return }
+    setMovementQuantity('1'); setMovementDelta(''); setMovementReason('')
+    setMessage('Movimiento de inventario registrado correctamente.')
+    const [history] = await Promise.all([inventory.movements(undefined, 200), load()])
+    if (history.ok) setMovementRows(history.data as Row[])
   }
 
   function beginEditProduct(product: Row) {
@@ -549,7 +593,12 @@ export default function OperationsPage() {
        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm"><p className="text-xs text-amber-800">Stock bajo</p><p className="mt-2 text-2xl font-bold text-amber-700">{inventoryStats.low}</p><p className="mt-1 text-[11px] text-amber-700">En el mínimo o por debajo</p></div>
        <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm"><p className="text-xs text-red-800">Agotados</p><p className="mt-2 text-2xl font-bold text-red-700">{inventoryStats.out}</p><p className="mt-1 text-[11px] text-red-700">Sin existencias</p></div>
      </div>}
-    {section === 'Inventario' && <>
+    {section === 'Inventario' && <div className="mb-4 flex flex-wrap gap-2">
+       <button type="button" onClick={() => setInventoryView('products')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${inventoryView === 'products' ? 'bg-[#172b4d] text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>Productos</button>
+       <button type="button" onClick={() => setInventoryView('movements')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${inventoryView === 'movements' ? 'bg-[#172b4d] text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>Movimientos</button>
+       <button type="button" onClick={() => setInventoryView('alerts')} className={`rounded-lg px-4 py-2 text-sm font-semibold ${inventoryView === 'alerts' ? 'bg-[#172b4d] text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>Alertas de stock</button>
+     </div>}
+    {section === 'Inventario' && inventoryView === 'products' && <>
        <form onSubmit={saveMinimumStock} className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-4">
          <div className="md:col-span-4"><h3 className="font-semibold text-slate-800">Configurar stock mínimo</h3><p className="mt-1 text-xs text-slate-600">Se mostrará una alerta cuando la existencia llegue al mínimo o quede por debajo.</p></div>
          <label className="text-sm">Producto<select required value={minimumProduct} onChange={(e) => setMinimumProduct(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar producto…</option>{rows.map((r) => <option key={String(r.id)} value={String(r.id)}>{String(r.name)}</option>)}</select></label>
@@ -578,6 +627,19 @@ export default function OperationsPage() {
        <div className="mt-3 rounded-xl border border-slate-200 p-3"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Editar o desactivar categorías</p><div className="flex flex-wrap gap-2">{categories.map((c) => <div key={String(c.id)} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="font-semibold">{String(c.name)}</span>{c.active === false && <span className="text-amber-700">Inactiva</span>}<button type="button" onClick={() => { setEditingCategoryId(String(c.id)); setCategoryName(String(c.name)) }} className="font-semibold text-blue-700 underline">Editar</button><button type="button" onClick={() => void toggleCategoryActive(c)} disabled={busy} className="font-semibold text-red-700 underline">{c.active === false ? "Reactivar" : "Desactivar"}</button></div>)}</div></div>
        <label className="mt-3 inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> Mostrar productos desactivados</label>
     </>}
+    {section === 'Inventario' && inventoryView === 'movements' && <div className="mt-4 space-y-4">
+       <form onSubmit={saveInventoryMovement} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-5">
+         <div className="md:col-span-5"><h3 className="font-semibold">Registrar movimiento</h3><p className="text-xs text-slate-500">Cada entrada, salida o ajuste queda guardado en el historial.</p></div>
+         <label className="text-sm">Tipo<select value={movementType} onChange={(e) => setMovementType(e.target.value as 'entry' | 'exit' | 'adjustment')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="entry">Entrada</option><option value="exit">Salida</option><option value="adjustment">Ajuste</option></select></label>
+         <label className="text-sm md:col-span-2">Producto<select required value={movementProduct} onChange={(e) => setMovementProduct(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{rows.filter((r) => r.active !== false).map((r) => <option key={String(r.id)} value={String(r.id)}>{String(r.name)}</option>)}</select></label>
+         <label className="text-sm md:col-span-2">Depósito<select required value={movementWarehouse} onChange={(e) => setMovementWarehouse(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar…</option>{inventoryWarehouses.map((w) => <option key={String(w.id)} value={String(w.id)}>{String(w.name)}</option>)}</select></label>
+         <label className="text-sm">Cantidad<input required type="number" min="0.000001" step="0.000001" value={movementQuantity} onChange={(e) => setMovementQuantity(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>
+         {movementType === 'adjustment' && <label className="text-sm">Diferencia (+/-)<input required type="number" step="0.000001" value={movementDelta} onChange={(e) => setMovementDelta(e.target.value)} placeholder="Ej. -2 o 5" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>}
+         <label className="text-sm md:col-span-2">Motivo / referencia<input value={movementReason} onChange={(e) => setMovementReason(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" /></label>
+         <button disabled={busy} className="self-end rounded-lg bg-[#172b4d] px-4 py-2 font-semibold text-white disabled:opacity-50">Guardar movimiento</button>
+       </form>
+       <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[760px] text-sm"><thead className="bg-slate-50"><tr>{['Fecha','Producto','Depósito','Tipo','Cantidad','Saldo','Motivo'].map((h) => <th key={h} className="p-3 text-left text-xs font-bold uppercase text-slate-500">{h}</th>)}</tr></thead><tbody>{movementRows.map((m) => <tr key={String(m.id)} className="border-t border-slate-100"><td className="p-3">{m.created_at ? new Date(String(m.created_at)).toLocaleString('es-VE') : '—'}</td><td className="p-3">{String(rows.find((r) => String(r.id) === String(m.product_id))?.name ?? m.product_id)}</td><td className="p-3">{String(inventoryWarehouses.find((w) => String(w.id) === String(m.warehouse_id))?.name ?? m.warehouse_id)}</td><td className="p-3">{String(m.movement_type)}</td><td className="p-3">{String(m.quantity_delta)}</td><td className="p-3">{String(m.balance_after)}</td><td className="p-3">{String(m.reason ?? '—')}</td></tr>)}</tbody></table>{movementRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">Todavía no hay movimientos registrados.</p>}</div>
+     </div>}
     {(section === 'Ventas' || section === 'Cotizaciones') && <div className="mt-5 space-y-4">
       <form onSubmit={addCartLine} className="grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4">
         <label className="text-sm md:col-span-2">Producto<select required value={cartProduct} onChange={e => { setCartProduct(e.target.value); const p=saleProducts.find(x=>String(x.id)===e.target.value); setCartPrice(p ? String(p.sale_price ?? '') : '') }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Seleccionar producto…</option>{saleProducts.map(p=><option key={String(p.id)} value={String(p.id)}>{String(p.name)} · {String(p.sku ?? 'Sin código')}</option>)}</select></label>
