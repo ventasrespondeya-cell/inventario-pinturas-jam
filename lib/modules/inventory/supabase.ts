@@ -11,8 +11,9 @@ function dbError<T>(error: { code?: string; message: string } | null, data: T | 
 
 export class CatalogService {
   constructor(private readonly db: SupabaseClient) {}
-  async listProducts(search = ''): Promise<Result<unknown[]>> {
-    let query = this.db.from('jam_products').select('id,sku,name,brand,category_id,presentation,unit,color,active,sale_price,bcv_price,created_at').eq('active', true).order('name');
+  async listProducts(search = '', includeInactive = false): Promise<Result<unknown[]>> {
+    let query = this.db.from('jam_products').select('id,sku,name,brand,category_id,presentation,unit,color,active,sale_price,bcv_price,created_at').order('name');
+    if (!includeInactive) query = query.eq('active', true);
     if (search.trim()) query = query.ilike('name', `%${search.trim().replace(/[%_,]/g, '')}%`);
     const { data, error } = await query;
     return dbError(error, data);
@@ -25,8 +26,18 @@ export class CatalogService {
     });
     return dbError(error, data);
   }
-  async listCategories(): Promise<Result<unknown[]>> {
-    const { data, error } = await this.db.from('jam_categories').select('id,name,active').eq('active', true).order('name');
+  async listCategories(includeInactive = false): Promise<Result<unknown[]>> {
+    let query = this.db.from('jam_categories').select('id,name,active').order('name');
+    if (!includeInactive) query = query.eq('active', true);
+    const { data, error } = await query;
+    return dbError(error, data);
+  }
+  async setProductActive(productId: string, active: boolean, actor: Actor): Promise<Result<unknown>> {
+    const { data, error } = await this.db.rpc('jam_catalog_set_product_active', { p_product_id: productId, p_active: active, p_actor_id: actor.userId });
+    return dbError(error, data);
+  }
+  async setCategoryActive(categoryId: string, active: boolean, actor: Actor): Promise<Result<unknown>> {
+    const { data, error } = await this.db.rpc('jam_catalog_set_category_active', { p_category_id: categoryId, p_active: active, p_actor_id: actor.userId });
     return dbError(error, data);
   }
   async saveCategory(name: string, actor: Actor, categoryId?: string): Promise<Result<unknown>> {
