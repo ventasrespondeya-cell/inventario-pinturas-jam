@@ -138,7 +138,7 @@ export default function OperationsPage() {
   useEffect(() => {
     if (!user || (section !== 'Compras' && section !== 'Cuentas')) return
     let mounted = true
-    Promise.all([purchases.listSuppliers(), catalog.listProducts(), inventory.warehouses(), purchases.listPayables(), commercial.listPaymentMethods(), commercial.listReceivables(), commercial.listCustomers()]).then(([suppliers, products, stockrooms, payables, methods, receivables, customers]) => {
+    Promise.all([purchases.listSuppliers(), catalog.listProducts(), inventory.warehouses(), purchases.listPayables(), commercial.listPaymentMethods(), commercial.listReceivables(), commercial.listCustomers(), purchases.getExchangeRate(new Date().toISOString().slice(0,10))]).then(([suppliers, products, stockrooms, payables, methods, receivables, customers, rate]) => {
       if (!mounted) return
       if (suppliers.ok) { setPurchaseSuppliers(suppliers.data as unknown as Row[]); if (!purchaseSupplier && suppliers.data[0]) setPurchaseSupplier(String((suppliers.data[0] as unknown as Row).id)) }
       if (products.ok) setPurchaseProducts(products.data as Row[])
@@ -147,6 +147,7 @@ export default function OperationsPage() {
       if (methods.ok) { const activeMethods = (methods.data as Row[]).filter(x => x.active !== false); setPaymentMethods(activeMethods); setSupplierPaymentMethods(activeMethods); if (!supplierPayMethod && activeMethods[0]) setSupplierPayMethod(String(activeMethods[0].name)); if (!customerPayMethod && activeMethods[0]) setCustomerPayMethod(String(activeMethods[0].name)) }
       if (receivables.ok) { const items = receivables.data as Row[]; setReportReceivables(items); if (!selectedReceivable && items[0]) setSelectedReceivable(String(items[0].id)) }
       if (customers.ok) setCustomerRows(customers.data as Row[])
+      if (rate.ok) { setBcvRate(Number(rate.data.rate)); setBcvRateId(String(rate.data.id)) }
     }).catch(e => setMessage(errorText(e)))
     return () => { mounted = false }
   }, [user, section, purchases, catalog, inventory, commercial])
@@ -469,8 +470,10 @@ export default function OperationsPage() {
   async function registerCustomerPayment() {
     const receivable = reportReceivables.find(row => String(row.id) === selectedReceivable)
     if (!receivable || !customerPayAmount.trim() || !customerPayMethod) { setMessage('Selecciona una cuenta, método e importe.'); return }
+    const currency = String(receivable.currency) as Currency
+    if (currency === 'USD' && !bcvRate) { setMessage('No hay una tasa BCV disponible para registrar este abono.'); return }
     setBusy(true); setMessage('')
-    const result = await commercial.registerCustomerPayment({ receivableId: String(receivable.id), amount: customerPayAmount.trim(), currency: String(receivable.currency) as Currency, paymentDate: new Date().toISOString().slice(0,10), method: customerPayMethod, reference: customerPayReference.trim() || null, idempotencyKey: crypto.randomUUID() })
+    const result = await commercial.registerCustomerPayment({ receivableId: String(receivable.id), amount: customerPayAmount.trim(), currency, ...(currency === 'USD' ? { exchangeRate: String(bcvRate) } : {}), paymentDate: new Date().toISOString().slice(0,10), method: customerPayMethod, reference: customerPayReference.trim() || null, idempotencyKey: crypto.randomUUID() })
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
     setCustomerPayAmount(''); setCustomerPayReference(''); setMessage('Abono registrado. La cuenta y el evento para caja se actualizaron automáticamente.')
@@ -482,8 +485,10 @@ export default function OperationsPage() {
   async function registerSupplierPayment() {
     const payable = payableRows.find(row => String(row.id) === selectedPayable)
     if (!payable || !supplierPayAmount.trim() || !supplierPayMethod) { setMessage('Selecciona una cuenta por pagar, método e importe.'); return }
+    const currency = String(payable.currency) as Currency
+    if (currency === 'USD' && !bcvRate) { setMessage('No hay una tasa BCV disponible para registrar este pago.'); return }
     setBusy(true); setMessage('')
-    const result = await purchases.registerPayment({ payableId: String(payable.id), amount: supplierPayAmount.trim(), currency: String(payable.currency) as Currency, paymentDate: new Date().toISOString().slice(0, 10), method: supplierPayMethod, reference: supplierPayReference.trim() || null, idempotencyKey: crypto.randomUUID() })
+    const result = await purchases.registerPayment({ payableId: String(payable.id), amount: supplierPayAmount.trim(), currency, ...(currency === 'USD' ? { exchangeRate: String(bcvRate) } : {}), paymentDate: new Date().toISOString().slice(0, 10), method: supplierPayMethod, reference: supplierPayReference.trim() || null, idempotencyKey: crypto.randomUUID() })
     setBusy(false)
     if (!result.ok) { setMessage(result.error.message); return }
     setSupplierPayAmount(''); setSupplierPayReference(''); setMessage('Pago al proveedor registrado. Se generó el evento para su integración con caja.');
