@@ -347,8 +347,7 @@ export default function OperationsPage() {
     setProductColor(String(product.color ?? ''))
     setProductPrice(String(product.sale_price ?? ''))
     setMessage('')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+    window.scrollTo({ top: 0, behavior: 'smooth' })  }
 
   async function toggleProductActive(product: Row) {
     if (!user) return
@@ -593,9 +592,18 @@ export default function OperationsPage() {
       {notice && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{notice}</p>}
     <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="mb-5 flex flex-wrap items-center justify-end gap-3">{(section !== 'Inventario' || inventoryView === 'products' || inventoryView === 'alerts') && <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Buscar ${section.toLowerCase()}…`} aria-label={`Buscar ${section.toLowerCase()}`} className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#244477] focus:ring-2 focus:ring-blue-100" />}</div>
      {section === 'Inventario' && ['products', 'alerts'].includes(inventoryView) && <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-slate-100 pb-4"><div className="mr-auto"><p className="text-xs text-slate-500">Valor del inventario</p><p className="text-xl font-semibold tracking-tight text-slate-900">{inventoryStats.valueUsd === null ? '—' : 'USD ' + inventoryStats.valueUsd.toFixed(2)}</p></div><div className="flex items-center gap-5 text-sm"><div><p className="text-xs text-slate-500">Productos</p><p className="font-semibold tabular-nums">{inventoryStats.total}</p></div><div><p className="text-xs text-slate-500">Unidades</p><p className="font-semibold tabular-nums">{inventoryStats.units.toLocaleString('es-VE')}</p></div><div><p className="text-xs text-slate-500">Stock bajo</p><p className="font-semibold tabular-nums text-amber-700">{inventoryStats.low}</p></div><div><p className="text-xs text-slate-500">Agotados</p><p className="font-semibold tabular-nums text-red-700">{inventoryStats.out}</p></div></div></div>}
-    {section === 'Inventario' && <nav aria-label="Apartados de inventario" className="mb-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-      {([{id:'products',label:'Productos'},{id:'categories',label:'Categorías'},{id:'minimum',label:'Stock mínimo'},{id:'movements',label:'Movimientos'},{id:'alerts',label:'Alertas'}] as const).map((tab) => <button key={tab.id} type="button" onClick={() => { setInventoryView(tab.id); setSelectedCategory(''); setSelectedPresentation(''); setStockFilter('all') }} aria-current={inventoryView === tab.id ? 'page' : undefined} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition ${inventoryView === tab.id ? 'bg-[#172b4d] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{tab.label}</button>)}
-    </nav>}
+    {section === 'Inventario' && <div className="mb-5 flex items-center justify-end">
+      <label className="flex items-center gap-2 text-xs text-slate-500">
+        <span>Ver</span>
+        <select aria-label="Apartado de inventario" value={inventoryView} onChange={(e) => { setInventoryView(e.target.value as typeof inventoryView); setSelectedCategory(''); setSelectedPresentation(''); setStockFilter('all') }} className="min-w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-[#244477] focus:ring-2 focus:ring-blue-100">
+          <option value="products">Productos</option>
+          <option value="categories">Categorías</option>
+          <option value="minimum">Stock mínimo</option>
+          <option value="movements">Movimientos</option>
+          <option value="alerts">Alertas</option>
+        </select>
+      </label>
+    </div>}
     {section === 'Inventario' && ['products', 'categories', 'minimum'].includes(inventoryView) && <>
       {inventoryView === 'minimum' && <div className="max-w-3xl"><form onSubmit={saveMinimumStock} className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-4">
          <div className="md:col-span-4"><h3 className="font-semibold text-slate-800">Configurar stock mínimo</h3><p className="mt-1 text-xs text-slate-600">Se mostrará una alerta cuando la existencia llegue al mínimo o quede por debajo.</p></div>
