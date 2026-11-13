@@ -80,7 +80,7 @@ test('compras permite crear, aprobar y recibir mercancía usando PurchasesServic
 test('cuentas por pagar registra pagos mediante el servicio y conserva la moneda de la deuda', () => {
   assert.match(route, /purchases\.listPayables/)
   assert.match(route, /purchases\.registerPayment/)
-  assert.match(route, /currency: String\(payable\.currency\) as Currency/)
+  assert.match(route, /currency, \.\.\.\(currency === 'USD' \? \{ exchangeRate: String\(bcvRate\) \} : \{\}\)/)
 })
 
 test('resumen del negocio muestra valores reales y productos más vendidos', () => {
