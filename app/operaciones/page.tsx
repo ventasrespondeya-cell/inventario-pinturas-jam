@@ -31,6 +31,8 @@ export default function OperationsPage() {
   const [password, setPassword] = useState('')
   const [categories, setCategories] = useState<Row[]>([])
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedPresentation, setSelectedPresentation] = useState('')
+  const [stockFilter, setStockFilter] = useState<'all' | 'available' | 'low' | 'out'>('all')
   const [categoryName, setCategoryName] = useState('')
   const [editingCategoryId, setEditingCategoryId] = useState('')
   const [showInactive, setShowInactive] = useState(false)
@@ -503,7 +505,7 @@ export default function OperationsPage() {
     const keys = new Set(rows.flatMap((r) => Object.keys(r)))
     if (section === 'Cuentas') return (accountView === 'receivable' ? ['customer_id','currency','original_amount','paidAmount','balance','status','due_date'] : ['supplier_id','currency','original_amount','paidAmount','balance','status','created_at']).filter(k => keys.has(k))
     const preferred: Record<Section, string[]> = {
-      Inventario: ['name','category_id','presentation','color','sale_price','quantity','minimum_stock','stock_status','inventory_value','actions'],
+      Inventario: ['name','presentation','color','sale_price','quantity','stock_status','actions'],
       Compras: ['document_number','document_date','currency','status','total','created_at'],
       Cotizaciones: ['quote_number','quote_date','currency','status','total','valid_until','actions'],
       Cuentas: [],
@@ -522,10 +524,20 @@ export default function OperationsPage() {
     return [...totals.values()].sort((a,b) => b.quantity - a.quantity).slice(0,5)
   }, [reportSales])
   const sumCurrency = (items: Row[], field: string, currency: string) => items.filter(x => String(x.currency ?? '') === currency).reduce((sum,x) => sum + Number(x[field] ?? 0),0)
-  const visibleRows = useMemo(() => section === 'Inventario' && selectedCategory
-    ? inventoryRows.filter((r) => String(r.category_id ?? '') === selectedCategory)
-    : section === 'Inventario' && inventoryView === 'alerts' ? inventoryRows.filter((r) => r.active !== false && (Number(r.quantity ?? 0) <= 0 || (Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0))))
-    : section === 'Inventario' ? inventoryRows : rows, [rows, section, selectedCategory, inventoryRows, inventoryView])
+  const presentationOptions = useMemo(() => [...new Set(inventoryRows.map((r) => String(r.presentation ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')), [inventoryRows])
+  const visibleRows = useMemo(() => {
+    if (section !== 'Inventario') return rows
+    let filtered = inventoryRows
+    if (selectedCategory) filtered = filtered.filter((r) => String(r.category_id ?? '') === selectedCategory)
+    if (selectedPresentation) filtered = filtered.filter((r) => String(r.presentation ?? '').trim() === selectedPresentation)
+    if (inventoryView === 'alerts') filtered = filtered.filter((r) => r.active !== false && (Number(r.quantity ?? 0) <= 0 || (Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0))))
+    if (inventoryView === 'products') {
+      if (stockFilter === 'out') filtered = filtered.filter((r) => Number(r.quantity ?? 0) <= 0)
+      if (stockFilter === 'low') filtered = filtered.filter((r) => Number(r.quantity ?? 0) > 0 && Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0))
+      if (stockFilter === 'available') filtered = filtered.filter((r) => Number(r.quantity ?? 0) > 0 && !(Number(r.minimum_stock ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.minimum_stock ?? 0)))
+    }
+    return filtered
+  }, [rows, section, selectedCategory, selectedPresentation, inventoryRows, inventoryView, stockFilter])
 
   if (!ready) return <main className="min-h-screen bg-slate-50 p-8 text-slate-700">Cargando sesión segura…</main>
 
@@ -578,15 +590,9 @@ export default function OperationsPage() {
         <div className="p-4 sm:p-6 md:p-8">
       {notice && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{notice}</p>}
     <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="mb-5 flex flex-wrap items-center justify-end gap-3">{(section !== 'Inventario' || inventoryView === 'products' || inventoryView === 'alerts') && <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Buscar ${section.toLowerCase()}…`} aria-label={`Buscar ${section.toLowerCase()}`} className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#244477] focus:ring-2 focus:ring-blue-100" />}</div>
-     {section === 'Inventario' && ['products', 'alerts'].includes(inventoryView) && <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-5">
-       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Total de productos</p><p className="mt-2 text-2xl font-bold">{inventoryStats.total}</p><p className="mt-1 text-[11px] text-slate-400">Productos registrados</p></div>
-       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Unidades disponibles</p><p className="mt-2 text-2xl font-bold">{inventoryStats.units.toLocaleString('es-VE')}</p><p className="mt-1 text-[11px] text-slate-400">Existencia total</p></div>
-       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm"><p className="text-xs text-amber-800">Stock bajo</p><p className="mt-2 text-2xl font-bold text-amber-700">{inventoryStats.low}</p><p className="mt-1 text-[11px] text-amber-700">En el mínimo o por debajo</p></div>
-       <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm"><p className="text-xs text-red-800">Agotados</p><p className="mt-2 text-2xl font-bold text-red-700">{inventoryStats.out}</p><p className="mt-1 text-[11px] text-red-700">Sin existencias</p></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">Valor de mercancía</p><p className="mt-2 text-2xl font-bold">{inventoryStats.valueUsd === null ? '—' : 'USD ' + inventoryStats.valueUsd.toFixed(2)}</p><p className="mt-1 text-[11px] text-slate-400">Costo promedio convertido a USD</p></div>
-     </div>}
-    {section === 'Inventario' && <nav aria-label="Apartados de inventario" className="mb-5 flex gap-2 overflow-x-auto border-b border-slate-200 pb-2">
-      {([{id:'products',label:'Productos'},{id:'categories',label:'Categorías'},{id:'minimum',label:'Stock mínimo'},{id:'movements',label:'Movimientos'},{id:'alerts',label:'Alertas'}] as const).map((tab) => <button key={tab.id} type="button" onClick={() => { setInventoryView(tab.id); setSelectedCategory('') }} aria-current={inventoryView === tab.id ? 'page' : undefined} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition ${inventoryView === tab.id ? 'bg-[#172b4d] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{tab.label}</button>)}
+     {section === 'Inventario' && ['products', 'alerts'].includes(inventoryView) && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3"><div><p className="text-xs font-medium text-slate-500">Valor total de mercancía</p><p className="text-2xl font-bold text-emerald-700">{inventoryStats.valueUsd === null ? '—' : 'USD ' + inventoryStats.valueUsd.toFixed(2)}</p><p className="text-xs text-slate-500">Costo promedio convertido a USD · {inventoryStats.total} productos · {inventoryStats.units.toLocaleString('es-VE')} unidades</p></div><div className="flex flex-wrap gap-2 text-xs"><span className="rounded-full bg-amber-100 px-3 py-1.5 font-semibold text-amber-800">Stock bajo: {inventoryStats.low}</span><span className="rounded-full bg-red-100 px-3 py-1.5 font-semibold text-red-700">Agotados: {inventoryStats.out}</span></div></div>}
+    {section === 'Inventario' && <nav aria-label="Apartados de inventario" className="mb-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+      {([{id:'products',label:'Productos'},{id:'categories',label:'Categorías'},{id:'minimum',label:'Stock mínimo'},{id:'movements',label:'Movimientos'},{id:'alerts',label:'Alertas'}] as const).map((tab) => <button key={tab.id} type="button" onClick={() => { setInventoryView(tab.id); setSelectedCategory(''); setSelectedPresentation(''); setStockFilter('all') }} aria-current={inventoryView === tab.id ? 'page' : undefined} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition ${inventoryView === tab.id ? 'bg-[#172b4d] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{tab.label}</button>)}
     </nav>}
     {section === 'Inventario' && ['products', 'categories', 'minimum'].includes(inventoryView) && <>
       {inventoryView === 'minimum' && <div className="max-w-3xl"><form onSubmit={saveMinimumStock} className="mt-5 grid gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-4">
@@ -605,7 +611,7 @@ export default function OperationsPage() {
       </form>
         <div className="mt-3 rounded-xl border border-slate-200 p-3"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Editar o desactivar categorías</p><div className="flex flex-wrap gap-2">{categories.map((c) => <div key={String(c.id)} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="font-semibold">{String(c.name)}</span>{c.active === false && <span className="text-amber-700">Inactiva</span>}<button type="button" onClick={() => { setEditingCategoryId(String(c.id)); setCategoryName(String(c.name)) }} className="font-semibold text-blue-700 underline">Editar</button><button type="button" onClick={() => void toggleCategoryActive(c)} disabled={busy} className="font-semibold text-red-700 underline">{c.active === false ? "Reactivar" : "Desactivar"}</button></div>)}</div></div>
       </div>}
-      {inventoryView === 'products' && <div className="space-y-4"><form onSubmit={createProduct} className="mt-3 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-4">
+      {inventoryView === 'products' && <div className="space-y-4"><div className="rounded-xl border border-slate-200 bg-white p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Presentaciones</p><span className="text-xs text-slate-400">Filtra por las presentaciones registradas</span></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setSelectedPresentation('')} className={`rounded-lg border px-3 py-2 text-sm font-medium ${!selectedPresentation ? 'border-[#172b4d] bg-[#172b4d] text-white' : 'border-slate-200 bg-white text-slate-700'}`}>Todas</button>{presentationOptions.map((presentation) => <button key={presentation} type="button" onClick={() => setSelectedPresentation(presentation)} className={`rounded-lg border px-3 py-2 text-sm font-medium ${selectedPresentation === presentation ? 'border-[#172b4d] bg-[#172b4d] text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{presentation}</button>)}</div></div><div className="flex flex-wrap items-center gap-2"><span className="mr-1 text-xs font-medium text-slate-500">Estado:</span>{([{id:'all',label:'Todos'},{id:'available',label:'Disponibles'},{id:'low',label:'Stock bajo'},{id:'out',label:'Agotados'}] as const).map((filter) => <button key={filter.id} type="button" onClick={() => setStockFilter(filter.id)} aria-pressed={stockFilter === filter.id} className={`rounded-full border px-3 py-1.5 text-xs font-medium ${stockFilter === filter.id ? 'border-slate-400 bg-slate-100 text-slate-800' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>{filter.label}</button>)}</div><form onSubmit={createProduct} className="mt-3 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-4">
          <div className="md:col-span-4 text-sm font-semibold">{editingProduct ? "Editar producto" : "Agregar producto"}</div>
         <label className="text-sm">Nombre del producto *<input required value={productName} onChange={(e) => setProductName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <label className="text-sm">Categoría<select value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Sin categoría</option>{categories.filter((c) => c.active !== false).map((c) => <option key={String(c.id)} value={String(c.id)}>{String(c.name)}</option>)}</select></label>
@@ -615,7 +621,7 @@ export default function OperationsPage() {
         <label className="text-sm">Precio de venta (USD)<input inputMode="decimal" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} placeholder="Ej. 12.50" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
         <div className="flex flex-wrap gap-2 md:col-span-4"><button disabled={busy} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{editingProduct ? "Guardar cambios" : "Guardar producto"}</button>{editingProduct && <button type="button" onClick={() => { setEditingProduct(null); setProductName(""); setProductCategory(""); setProductPresentation(""); setProductColor(""); setProductPrice("") }} className="rounded-lg border border-slate-300 px-4 py-2">Cancelar edición</button>}</div>
       </form>
-        <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => setSelectedCategory('')} className="rounded-full border px-3 py-1 text-xs">Todas las categorías</button>{categories.filter((c) => c.active !== false).map((c) => <button key={String(c.id)} onClick={() => setSelectedCategory(String(c.id))} className={`rounded-full border px-3 py-1 text-xs ${selectedCategory === String(c.id) ? 'border-orange-400 bg-orange-100 text-orange-900' : 'border-slate-200 bg-white text-slate-700'}`}>{String(c.name)}</button>)}</div>
+        <div className="mt-3 flex flex-wrap gap-2 border-b border-slate-100 pb-3"><button onClick={() => setSelectedCategory('')} className="rounded-full border px-3 py-1 text-xs">Todas las categorías</button>{categories.filter((c) => c.active !== false).map((c) => <button key={String(c.id)} onClick={() => setSelectedCategory(String(c.id))} className={`rounded-md border px-3 py-2 text-sm font-medium ${selectedCategory === String(c.id) ? 'border-[#172b4d] bg-[#172b4d] text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>{String(c.name)}</button>)}</div>
         <label className="mt-3 inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> Mostrar productos desactivados</label>
       </div>}
     </>}
